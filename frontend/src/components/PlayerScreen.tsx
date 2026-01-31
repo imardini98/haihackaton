@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Hand, Shuffle, Repeat, ArrowLeft, MoreVertical } from 'lucide-react';
 import { QuestionModal } from './QuestionModal';
-import { AnswerModal } from './AnswerModal';
 import { HandRaiseAnimation } from './HandRaiseAnimation';
 
 interface PlayerScreenProps {
@@ -15,8 +14,6 @@ export function PlayerScreen({ topic, onBackToLanding }: PlayerScreenProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [showHandAnimation, setShowHandAnimation] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [showAnswerModal, setShowAnswerModal] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState('');
   const intervalRef = useRef<number | null>(null);
 
   const totalDuration = 240; // 4 minutes in seconds
@@ -87,18 +84,14 @@ export function PlayerScreen({ topic, onBackToLanding }: PlayerScreenProps) {
   };
 
   const handleAskQuestion = (question: string) => {
-    setCurrentQuestion(question);
     setShowQuestionModal(false);
-    setShowAnswerModal(true);
+    // The question is answered directly in the playback flow,
+    // so we don't show an additional "answer" popup screen.
+    setIsPlaying(true);
   };
 
   const handleResumeFromQuestion = () => {
     setShowQuestionModal(false);
-    setIsPlaying(true);
-  };
-
-  const handleResumeFromAnswer = () => {
-    setShowAnswerModal(false);
     setIsPlaying(true);
   };
 
@@ -237,12 +230,6 @@ export function PlayerScreen({ topic, onBackToLanding }: PlayerScreenProps) {
           onAsk={handleAskQuestion}
           onCancel={handleResumeFromQuestion}
           autoStartRecording={true}
-        />
-      )}
-      {showAnswerModal && (
-        <AnswerModal
-          question={currentQuestion}
-          onResume={handleResumeFromAnswer}
         />
       )}
     </>
