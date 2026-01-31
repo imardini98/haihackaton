@@ -27,7 +27,7 @@ MAX_ARXIV_RESULTS = 20
 TOP_N_RESULTS = 5
 GEMINI_MODEL = 'gemini-2.5-flash'
 MAX_PDF_PAGES = 50  # Maximum allowed pages for PDFs
-PAGE_CHECK_WORKERS = 20  # Number of parallel workers for page checking (faster!)
+PAGE_CHECK_WORKERS = 5  # Number of parallel workers for page checking (faster!)
 
 # Validate API key
 if not GEMINI_API_KEY:
