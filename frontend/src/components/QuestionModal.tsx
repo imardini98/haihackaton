@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Mic, Keyboard, StopCircle } from 'lucide-react';
 
 interface QuestionModalProps {
