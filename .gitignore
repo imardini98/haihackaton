@@ -1,11 +1,29 @@
 # Environment variables
 .env
 
-# Node modules
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+
+# Node modules (legacy JavaScript)
 node_modules/
 
-# CSV output files
+# Output files
 csv_files/
+arxiv_results_*.json
+arxiv_top5_links_*.json
+
+# Logs
+*.log
+npm-debug.log*
+pip-log.txt
 
 # OS files
 .DS_Store
@@ -16,5 +34,5 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-csv_files/
-node_modules/
+.ipynb_checkpoints/
+.venv

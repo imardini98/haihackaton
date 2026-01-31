@@ -1,0 +1,12 @@
+# arXiv Semantic Search System - Python Dependencies
+
+# Google Gemini Interactions API
+google-genai>=1.55.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Note: xml.etree.ElementTree is part of Python standard library (no install needed)
