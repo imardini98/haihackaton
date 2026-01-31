@@ -13,9 +13,14 @@ def example1():
     print('\n📌 EXAMPLE 1: Simple Query')
     print('=' * 60)
     
-    semantic_research_search(
+    results = semantic_research_search(
         "deep learning for image classification"
     )
+    
+    # Easy access to links array
+    print('\n✅ Top 5 PDF Links:')
+    for idx, link in enumerate(results['top_5_links'], 1):
+        print(f"  {idx}. {link}")
 
 
 def example2():

@@ -28,10 +28,15 @@ def run_demo():
             print(f'\n📁 Files saved:')
             print(f'   📄 Full details: {results["files"]["fullFile"]}')
             print(f'   🔗 Top 5 links: {results["files"]["linksFile"]}')
+            
+            print('\n📎 Top 5 Links Array:')
+            for idx, link in enumerate(results['top_5_links'], 1):
+                print(f'   {idx}. {link}')
+            
             print('\n💡 Tips:')
+            print('   - Access links: results["top_5_links"]')
             print('   - Try your own query: python arxiv_semantic_search.py "your query here"')
             print('   - Run examples: python example_usage.py 1')
-            print('   - Read docs: ARXIV_SEMANTIC_SEARCH.md')
     
     except Exception as error:
         print(f'\n❌ Demo failed: {error}')

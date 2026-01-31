@@ -19,6 +19,8 @@ node_modules/
 csv_files/
 arxiv_results_*.json
 arxiv_top5_links_*.json
+podcast_script_*.md
+*_metadata.json
 
 # Logs
 *.log

@@ -9,8 +9,11 @@ import time
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import xml.etree.ElementTree as ET
+import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
+import pikepdf
 from google import genai
 from dotenv import load_dotenv
 
@@ -23,6 +26,8 @@ ARXIV_API_BASE = 'http://export.arxiv.org/api/query'
 MAX_ARXIV_RESULTS = 20
 TOP_N_RESULTS = 5
 GEMINI_MODEL = 'gemini-2.5-flash'
+MAX_PDF_PAGES = 50  # Maximum allowed pages for PDFs
+PAGE_CHECK_WORKERS = 20  # Number of parallel workers for page checking (faster!)
 
 # Validate API key
 if not GEMINI_API_KEY:
@@ -36,61 +41,58 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 def refine_user_query(user_query: str, user_context: str = '') -> Dict[str, Any]:
     """
-    Step 1: Refine user query using Gemini to understand what they really need
+    Step 1: Refine user query using Gemini (optimized for speed)
     """
     print('\n🔍 Step 1: Refining user query with Gemini...')
     print(f'   Original query: "{user_query}"')
     
-    prompt = f"""You are a research assistant helping to refine academic search queries for arXiv.
+    # Optimized prompt - more concise
+    prompt = f"""Refine this arXiv search query.
 
-User Query: "{user_query}"
-{f'User Context: {user_context}' if user_context else ''}
+Query: "{user_query}"
+{f'Context: {user_context}' if user_context else ''}
 
-Your task is to:
-1. Understand what the user is really looking for
-2. Identify key concepts, methodologies, and domains
-3. Generate an optimized search query for arXiv that will find the most relevant papers
+Create optimized arXiv query with operators (ti:, abs:, cat:, all:).
+Identify 3-5 key concepts and brief focus statement.
 
-Provide your response in the following JSON format:
-{{
-  "refined_query": "optimized search query with arXiv search operators",
-  "key_concepts": ["concept1", "concept2", "concept3"],
-  "search_focus": "brief explanation of what to focus on",
-  "additional_filters": {{
-    "categories": ["suggested arXiv categories like cs.AI, cs.LG"],
-    "date_range": "recent or specify if historical context needed"
-  }}
-}}
-
-Important: Use arXiv search operators:
-- ti: for title search
-- abs: for abstract search
-- au: for author search
-- cat: for category search
-- all: for all fields
-
-Example: ti:"neural networks" AND abs:transformer AND cat:cs.LG"""
+Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": "...", "additional_filters": {{"categories": ["..."], "date_range": "..."}}}}"""
 
     try:
-        interaction = client.interactions.create(
+        # Use structured output for faster processing
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "refined_query": {"type": "string"},
+                "key_concepts": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "search_focus": {"type": "string"},
+                "additional_filters": {
+                    "type": "object",
+                    "properties": {
+                        "categories": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "date_range": {"type": "string"}
+                    }
+                }
+            },
+            "required": ["refined_query", "key_concepts", "search_focus"]
+        }
+        
+        response = client.models.generate_content(
             model=GEMINI_MODEL,
-            input=prompt
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": response_schema
+            }
         )
         
-        # Get the text output from the interaction
-        text_output = next((o for o in interaction.outputs if o.type == 'text'), None)
-        if not text_output:
-            raise Exception('No text output from Gemini')
-        
-        text = text_output.text
-        
-        # Extract JSON from the response (handling markdown code blocks)
-        import re
-        json_match = re.search(r'\{[\s\S]*\}', text)
-        if not json_match:
-            raise Exception('Could not extract JSON from Gemini response')
-        
-        refined_data = json.loads(json_match.group(0))
+        # Direct JSON parsing (faster with structured output)
+        refined_data = json.loads(response.text)
         
         print('   ✓ Query refined successfully!')
         print(f'   Refined query: "{refined_data["refined_query"]}"')
@@ -108,6 +110,133 @@ Example: ti:"neural networks" AND abs:transformer AND cat:cs.LG"""
             'search_focus': 'General search',
             'additional_filters': {}
         }
+
+
+def check_pdf_page_count(pdf_url: str, timeout: int = 15) -> Optional[int]:
+    """
+    Check the number of pages in a PDF
+    
+    Args:
+        pdf_url: URL to the PDF
+        timeout: Request timeout in seconds
+    
+    Returns:
+        Number of pages, or None if error
+    """
+    try:
+        # Download PDF with timeout
+        response = requests.get(pdf_url, timeout=timeout)
+        response.raise_for_status()
+        
+        # Load PDF into memory buffer
+        pdf_buffer = io.BytesIO(response.content)
+        
+        # Check page count with pikepdf
+        with pikepdf.open(pdf_buffer) as pdf:
+            num_pages = len(pdf.pages)
+            return num_pages
+    
+    except requests.Timeout:
+        return None
+    except requests.RequestException:
+        return None
+    except Exception:
+        return None
+
+
+def check_single_paper(paper: Dict[str, Any], max_pages: int) -> Dict[str, Any]:
+    """
+    Check a single paper's page count and return result
+    
+    Args:
+        paper: Paper dictionary
+        max_pages: Maximum allowed pages
+    
+    Returns:
+        Dict with paper and status info
+    """
+    pdf_url = paper['pdf_link']
+    arxiv_id = paper['arxiv_id']
+    
+    page_count = check_pdf_page_count(pdf_url)
+    
+    result = {
+        'paper': paper,
+        'arxiv_id': arxiv_id,
+        'page_count': page_count,
+        'included': False,
+        'reason': ''
+    }
+    
+    if page_count is None:
+        # If we can't check, include it (benefit of doubt)
+        paper['page_count'] = 'Unknown'
+        result['included'] = True
+        result['reason'] = 'Unknown (included)'
+    elif page_count <= max_pages:
+        paper['page_count'] = page_count
+        result['included'] = True
+        result['reason'] = f'✅ {page_count} pages'
+    else:
+        paper['page_count'] = page_count
+        result['included'] = False
+        result['reason'] = f'❌ {page_count} pages (excluded)'
+    
+    return result
+
+
+def filter_papers_by_page_count(papers: List[Dict[str, Any]], max_pages: int = MAX_PDF_PAGES, max_workers: int = PAGE_CHECK_WORKERS) -> tuple:
+    """
+    Filter papers to only include those with <= max_pages (parallel processing)
+    
+    Args:
+        papers: List of paper dictionaries
+        max_pages: Maximum allowed pages
+        max_workers: Number of concurrent threads
+    
+    Returns:
+        Tuple of (filtered_papers, excluded_papers)
+    """
+    print(f'\n📄 Checking PDF page counts (max: {max_pages} pages) - using {max_workers} parallel workers...')
+    print(f'   Processing {len(papers)} papers...\n')
+    
+    filtered_papers = []
+    excluded_papers = []
+    
+    # Process papers concurrently
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_paper = {
+            executor.submit(check_single_paper, paper, max_pages): paper 
+            for paper in papers
+        }
+        
+        # Process results as they complete
+        completed = 0
+        for future in as_completed(future_to_paper):
+            completed += 1
+            try:
+                result = future.result()
+                
+                # Print progress
+                print(f'   [{completed}/{len(papers)}] {result["arxiv_id"]} - {result["reason"]}')
+                
+                if result['included']:
+                    filtered_papers.append(result['paper'])
+                else:
+                    excluded_papers.append(result['paper'])
+                    
+            except Exception as exc:
+                paper = future_to_paper[future]
+                print(f'   [{completed}/{len(papers)}] {paper["arxiv_id"]} - ⚠️  Error: {exc}')
+                # Include on error (benefit of doubt)
+                paper['page_count'] = 'Error'
+                filtered_papers.append(paper)
+    
+    print(f'\n   ✅ {len(filtered_papers)} papers kept')
+    print(f'   ❌ {len(excluded_papers)} papers excluded (too long)')
+    
+    return filtered_papers, excluded_papers
 
 
 def search_arxiv(refined_query: Dict[str, Any], max_results: int = MAX_ARXIV_RESULTS) -> List[Dict[str, Any]]:
@@ -200,76 +329,71 @@ def rank_papers_with_gemini(
     top_n: int = TOP_N_RESULTS
 ) -> Dict[str, Any]:
     """
-    Step 3: Use Gemini to classify and rank the papers
+    Step 3: Use Gemini to classify and rank the papers (optimized for speed)
     """
     print(f'\n🎯 Step 3: Using Gemini to rank papers (selecting top {top_n})...')
     
-    # Prepare paper summaries for Gemini
+    # Prepare compact paper summaries for Gemini (optimized)
     paper_summaries = [
         {
             'index': paper['index'],
             'title': paper['title'],
-            'authors': paper['authors'],
-            'abstract': paper['summary'][:500] + '...',  # Limit abstract length
-            'categories': ', '.join(paper['categories']),
+            'abstract': paper['summary'][:300] + '...',  # Reduced from 500 to 300 chars
             'arxiv_id': paper['arxiv_id']
         }
         for paper in papers
     ]
     
-    prompt = f"""You are an expert research paper evaluator and classifier.
+    # Optimized prompt - more concise, same quality
+    prompt = f"""Evaluate and rank these {len(papers)} arXiv papers for relevance.
 
-Original User Query: "{original_query}"
-Refined Search Focus: "{refined_query['search_focus']}"
-Key Concepts: {', '.join(refined_query['key_concepts'])}
+Query: "{original_query}"
+Focus: {refined_query['search_focus']}
+Concepts: {', '.join(refined_query['key_concepts'][:3])}
 
-Below are {len(papers)} papers from arXiv. Your task is to:
-1. Evaluate each paper's relevance to the user's research needs
-2. Consider: title relevance, abstract quality, author credibility, recency, and domain fit
-3. Rank them and select the TOP {top_n} most relevant papers
-4. Provide a relevance score (0-100) and justification for each selected paper
+Papers:
+{json.dumps(paper_summaries, indent=1)}
 
-Papers to evaluate:
-{json.dumps(paper_summaries, indent=2)}
-
-Provide your response in the following JSON format:
-{{
-  "top_papers": [
-    {{
-      "index": 1,
-      "relevance_score": 95,
-      "relevance_reason": "Brief explanation of why this paper is highly relevant",
-      "key_contributions": "What makes this paper valuable for the query"
-    }}
-  ],
-  "overall_analysis": "Brief overview of the paper landscape and why these top papers were selected"
-}}
-
-Return ONLY the JSON, no markdown formatting."""
+Select TOP {top_n} by relevance. For each: index, score (0-100), reason (1 sentence), contributions (1 sentence).
+Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_reason": "...", "key_contributions": "..."}}], "overall_analysis": "..."}}"""
 
     try:
-        interaction = client.interactions.create(
+        # Define JSON schema for structured output (faster than parsing)
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "top_papers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "index": {"type": "integer"},
+                            "relevance_score": {"type": "integer"},
+                            "relevance_reason": {"type": "string"},
+                            "key_contributions": {"type": "string"}
+                        },
+                        "required": ["index", "relevance_score", "relevance_reason", "key_contributions"]
+                    }
+                },
+                "overall_analysis": {"type": "string"}
+            },
+            "required": ["top_papers", "overall_analysis"]
+        }
+        
+        response = client.models.generate_content(
             model=GEMINI_MODEL,
-            input=prompt
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": response_schema
+            }
         )
         
-        # Get the text output from the interaction
-        text_output = next((o for o in interaction.outputs if o.type == 'text'), None)
-        if not text_output:
-            raise Exception('No text output from Gemini')
-        
-        text = text_output.text
-        
-        # Extract JSON from the response
-        import re
-        json_match = re.search(r'\{[\s\S]*\}', text)
-        if not json_match:
-            raise Exception('Could not extract JSON from Gemini response')
-        
-        ranking_data = json.loads(json_match.group(0))
+        # Direct JSON parsing (no regex needed with structured output)
+        ranking_data = json.loads(response.text)
         
         print('   ✓ Papers ranked successfully!')
-        print(f'   Analysis: {ranking_data["overall_analysis"]}')
+        print(f'   Analysis: {ranking_data["overall_analysis"][:100]}...')
         
         # Merge ranking data with original papers
         top_papers = []
@@ -314,6 +438,10 @@ def display_results(results: Dict[str, Any]):
         print(f'📂 Categories: {", ".join(paper["categories"])}')
         print(f'📅 Published: {datetime.fromisoformat(paper["published"].replace("Z", "+00:00")).strftime("%Y-%m-%d")}')
         
+        # Show page count if available
+        if 'page_count' in paper:
+            print(f'📄 Pages: {paper["page_count"]}')
+        
         if 'relevance_score' in paper:
             print(f'\n⭐ Relevance Score: {paper["relevance_score"]}/100')
             print(f'💡 Why Relevant: {paper["relevance_reason"]}')
@@ -327,7 +455,7 @@ def display_results(results: Dict[str, Any]):
     print('\n' + '=' * 80)
 
 
-def save_results(results: Dict[str, Any], user_query: str) -> Dict[str, str]:
+def save_results(results: Dict[str, Any], user_query: str, excluded_papers: List[Dict[str, Any]] = None, total_found: int = 0) -> Dict[str, str]:
     """Save results to JSON files"""
     timestamp = datetime.now().isoformat().replace(':', '-').replace('.', '-')
     filename = f'arxiv_results_{timestamp}.json'
@@ -337,11 +465,26 @@ def save_results(results: Dict[str, Any], user_query: str) -> Dict[str, str]:
     output = {
         'query': user_query,
         'timestamp': datetime.now().isoformat(),
+        'total_papers_found': total_found,
+        'papers_excluded_by_page_limit': len(excluded_papers) if excluded_papers else 0,
         'total_papers_analyzed': MAX_ARXIV_RESULTS,
         'top_papers_count': len(results['top_papers']),
+        'max_pdf_pages': MAX_PDF_PAGES,
         'overall_analysis': results['overall_analysis'],
         'papers': results['top_papers']
     }
+    
+    # Add excluded papers info if available
+    if excluded_papers and len(excluded_papers) > 0:
+        output['excluded_papers'] = [
+            {
+                'title': p['title'],
+                'arxiv_id': p['arxiv_id'],
+                'page_count': p.get('page_count', 'Unknown'),
+                'pdf_link': p['pdf_link']
+            }
+            for p in excluded_papers
+        ]
     
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
@@ -385,6 +528,8 @@ def semantic_research_search(
     print('\n' + '=' * 80)
     print('🚀 ARXIV SEMANTIC RESEARCH SYSTEM')
     print('   Powered by arXiv API + Google Gemini')
+    print(f'   PDF Page Limit: {MAX_PDF_PAGES} pages')
+    print(f'   Parallel Workers: {PAGE_CHECK_WORKERS} (faster checking!)')
     print('=' * 80)
     
     try:
@@ -404,21 +549,38 @@ def semantic_research_search(
         # Add a small delay to respect rate limits
         time.sleep(1)
         
+        # Step 2.5: Filter papers by page count (parallel processing)
+        filtered_papers, excluded_papers = filter_papers_by_page_count(papers, MAX_PDF_PAGES, PAGE_CHECK_WORKERS)
+        
+        if len(filtered_papers) == 0:
+            print('\n⚠️  No papers remain after filtering. All papers exceed page limit.')
+            return None
+        
+        # Add a small delay to respect rate limits
+        time.sleep(1)
+        
         # Step 3: Rank papers with Gemini
-        results = rank_papers_with_gemini(papers, user_query, refined_query, top_n)
+        results = rank_papers_with_gemini(filtered_papers, user_query, refined_query, top_n)
         
         # Display results
         display_results(results)
         
         # Save results
-        saved_files = save_results(results, user_query)
+        saved_files = save_results(results, user_query, excluded_papers, len(papers))
+        
+        # Create simple array of top 5 PDF links
+        top_5_links = [paper['pdf_link'] for paper in results['top_papers']]
         
         print('\n✅ Research search completed successfully!')
         
         return {
             **results,
             'refined_query': refined_query,
-            'files': saved_files
+            'files': saved_files,
+            'top_5_links': top_5_links,
+            'excluded_papers': excluded_papers,
+            'total_papers_found': len(papers),
+            'papers_after_filtering': len(filtered_papers)
         }
     
     except Exception as error:
@@ -441,7 +603,20 @@ if __name__ == '__main__':
         print('💡 Usage: python arxiv_semantic_search.py "your query" ["optional context"]\n')
     
     try:
-        semantic_research_search(user_query, user_context)
+        results = semantic_research_search(user_query, user_context)
+        
+        # Display the simple links array
+        print('\n📎 Top 5 Links Array:')
+        for idx, link in enumerate(results['top_5_links'], 1):
+            print(f"  {idx}. {link}")
+        
+        # Show filtering stats if available
+        if 'excluded_papers' in results and len(results['excluded_papers']) > 0:
+            print(f'\n📊 Filtering Summary:')
+            print(f"   Total papers found: {results.get('total_papers_found', 'N/A')}")
+            print(f"   Papers after filtering: {results.get('papers_after_filtering', 'N/A')}")
+            print(f"   Papers excluded (>{MAX_PDF_PAGES} pages): {len(results['excluded_papers'])}")
+        
         print('\n👋 Done!')
     except Exception as error:
         print(f'\n💥 Fatal error: {error}')
