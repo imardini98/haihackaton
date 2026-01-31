@@ -13,12 +13,26 @@ env/
 
 # Audio files
 audio_output/
+audio_files/*.mp3
+audio_files/*.wav
+!audio_files/.gitkeep
 *.mp3
 *.wav
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Whisper model cache
 *.pt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+.DS_Store
+*.log

@@ -1,8 +1,22 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
-python-dotenv>=1.0.0
+pydantic>=2.9.0
+pydantic-settings>=2.1.0
+python-multipart>=0.0.9
+httpx>=0.26.0
+aiofiles>=24.1.0
+jinja2>=3.1.0
+
+# Database & Auth
+supabase>=2.0.0
+
+# AI/ML
+google-generativeai>=0.3.0
 elevenlabs>=1.0.0
 faster-whisper>=1.0.0
-python-multipart>=0.0.9
-pydantic>=2.9.0
-aiofiles>=24.1.0
+
+# Paper Ingestion
+arxiv>=2.1.0
+
+# Utilities
+python-dotenv>=1.0.0

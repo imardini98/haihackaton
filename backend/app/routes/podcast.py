@@ -11,7 +11,7 @@ from app.services.segment_manager import segment_manager
 from app.services.stt_service import stt_service
 from app.services.tts_service import tts_service
 from app.services.voice_service import voice_service, VOICES
-from app.config import settings
+from app.config import get_settings
 
 import uuid
 import aiofiles
@@ -146,8 +146,9 @@ async def raise_hand_audio(session_id: str, audio: UploadFile = File(...)):
         )
     
     # Save uploaded file temporarily
+    settings = get_settings()
     temp_filename = f"temp_{uuid.uuid4()}{Path(audio.filename).suffix}"
-    temp_path = settings.AUDIO_OUTPUT_DIR / temp_filename
+    temp_path = settings.audio_output_path / temp_filename
     
     try:
         # Write uploaded file

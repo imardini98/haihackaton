@@ -31,7 +31,8 @@ class TTSService:
         Returns:
             Path to the generated audio file
         """
-        voice_id = voice_id or settings.DEFAULT_VOICE_ID
+        settings = get_settings()
+        voice_id = voice_id or settings.default_voice_id
         filename = filename or f"{uuid.uuid4()}.mp3"
         output_path = self.output_dir / filename
         

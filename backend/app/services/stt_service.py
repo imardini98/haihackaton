@@ -5,7 +5,7 @@ Transcribes user voice questions for the "Raise Hand" feature
 
 from faster_whisper import WhisperModel
 from pathlib import Path
-from app.config import settings
+from app.config import get_settings
 
 
 class STTService:
@@ -16,8 +16,9 @@ class STTService:
     def model(self):
         """Lazy load Whisper model to avoid startup delay."""
         if self._model is None:
+            settings = get_settings()
             self._model = WhisperModel(
-                settings.WHISPER_MODEL,
+                settings.whisper_model,
                 device="cpu",
                 compute_type="int8"
             )

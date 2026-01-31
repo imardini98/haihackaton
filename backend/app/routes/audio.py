@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from app.config import settings
+from app.config import get_settings
 from app.services.tts_service import tts_service
 from app.services.stt_service import stt_service
 
@@ -119,8 +119,9 @@ async def speech_to_text(audio: UploadFile = File(...)):
         )
     
     # Save uploaded file temporarily
+    settings = get_settings()
     temp_filename = f"temp_{uuid.uuid4()}{Path(audio.filename).suffix}"
-    temp_path = settings.AUDIO_OUTPUT_DIR / temp_filename
+    temp_path = settings.audio_output_path / temp_filename
     
     try:
         # Write uploaded file
