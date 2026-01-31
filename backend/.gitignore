@@ -1,0 +1,24 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Audio files
+audio_output/
+*.mp3
+*.wav
+
+# IDE
+.vscode/
+.idea/
+
+# Whisper model cache
+*.pt
