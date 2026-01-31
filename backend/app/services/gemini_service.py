@@ -11,6 +11,7 @@ class GeminiService:
 
     @property
     def model(self):
+        
         """Lazy-load Gemini model."""
         if self._model is None:
             settings = get_settings()

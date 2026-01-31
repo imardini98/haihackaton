@@ -24,8 +24,8 @@ def create_app() -> FastAPI:
         description="Transform scientific papers into interactive podcasts",
         version="0.1.0",
         lifespan=lifespan,
-        docs_url="/docs" if settings.is_development else None,
-        redoc_url="/redoc" if settings.is_development else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
 
     # CORS
@@ -49,7 +49,7 @@ def create_app() -> FastAPI:
         return {
             "service": "PodAsk API",
             "version": "0.1.0",
-            "docs": "/docs" if settings.is_development else None
+            "docs": "/docs"
         }
 
     return app
