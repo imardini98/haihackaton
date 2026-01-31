@@ -1,32 +1,33 @@
 """
-Podcast Synthesis Service
-Convert arXiv Papers to Podcast Script using Gemini PDF processing
+Podcast Service - Orchestrates podcast generation pipeline
+Merged: Uses Gemini Files API with PDF links + Segment system from main
 """
 
+from __future__ import annotations
+import asyncio
 import io
 import time
-from typing import List, Dict, Any
-from datetime import datetime
+from typing import Optional, List, Any
 
 import requests
 from google import genai
 
 from app.config import get_settings
+from app.services.supabase_service import supabase_service
+from app.services.gemini_service import gemini_service
+from app.services.elevenlabs_service import elevenlabs_service
 
-# Configuration
-settings = get_settings()
-GEMINI_MODEL = 'gemini-2.5-flash'
 
-
-class PodcastSynthesisService:
-    """Service for synthesizing research papers into podcast scripts"""
+class PodcastService:
+    """Orchestrates podcast generation pipeline using PDF links."""
 
     def __init__(self):
+        settings = get_settings()
         self.gemini_client = genai.Client(api_key=settings.gemini_api_key)
 
     def download_and_upload_pdfs(self, pdf_links: List[str]) -> List[Any]:
         """
-        Download PDFs from arXiv and upload them to Gemini Files API
+        Download PDFs from arXiv and upload them to Gemini Files API.
 
         Args:
             pdf_links: List of PDF URLs from arXiv
@@ -69,127 +70,160 @@ class PodcastSynthesisService:
 
         return uploaded_files
 
-    def synthesize_papers_to_podcast(
+    async def create_podcast(
         self,
         pdf_links: List[str],
-        topic: str = ""
-    ) -> Dict[str, Any]:
-        """
-        Synthesize multiple arXiv papers into a podcast script using Gemini PDF processing
+        topic: str,
+        difficulty_level: str,
+        user_id: str
+    ) -> dict:
+        """Create a new podcast record and start generation."""
+        # Create podcast record with pending status
+        podcast_data = {
+            "pdf_links": pdf_links,
+            "topic": topic,
+            "title": f"Podcast: {topic}",
+            "status": "pending",
+            "user_id": user_id
+        }
 
-        Args:
-            pdf_links: List of PDF URLs from arXiv
-            topic: Optional topic/context for the synthesis
+        podcast = await supabase_service.insert("podcasts", podcast_data)
+        return podcast
 
-        Returns:
-            dict with podcast_script and metadata
-        """
+    async def generate_podcast(self, podcast_id: str) -> None:
+        """Generate podcast script and audio (run as background task)."""
         try:
-            # Step 1: Download and upload PDFs to Gemini
-            uploaded_files = self.download_and_upload_pdfs(pdf_links)
-
-            # Step 2: Create the synthesis prompt
-            prompt = f"""You are an expert science communicator creating a podcast script that makes research accessible to everyone.
-
-I have provided {len(pdf_links)} research papers from arXiv as PDF documents.
-
-{f'Topic: {topic}' if topic else ''}
-
-Your task is to:
-1. Read and understand all {len(pdf_links)} papers thoroughly
-2. Identify the common themes and key insights
-3. **Find the connections and relationships between the papers**
-4. Synthesize the information into a cohesive, interconnected narrative
-5. Create an engaging podcast script (10-15 minutes when spoken)
-
-CRITICAL GUIDELINES FOR ACCESSIBILITY:
-- Use simple, everyday language - write as if explaining to a curious friend
-- Replace technical jargon with plain language (e.g., "neural network" → "a computer system that learns like a brain")
-- When technical terms are necessary, immediately explain them in simple words
-- Break down complex ideas into smaller, easy-to-grasp concepts
-- Use analogies and real-world examples that everyone can relate to
-- Keep sentences short and clear
-- Include all important details, but explain them simply
-- Focus on what things DO rather than what they ARE
-
-The podcast script should:
-- Start with a compelling hook that explains why this research matters in everyday terms
-- Explain the key concepts using simple, accessible language (imagine explaining to someone with no technical background)
-- **STRONGLY EMPHASIZE THE CONNECTIONS between papers:**
-  * Show how papers build on each other's ideas
-  * Highlight where papers agree or provide complementary perspectives
-  * Point out contrasting approaches or findings between papers
-  * Explain how together they tell a bigger story than individually
-  * Use explicit transition phrases: "This builds on...", "While the first paper showed X, the second paper takes it further...", "Interestingly, this contrasts with..."
-  * Weave papers together rather than presenting them sequentially
-- Highlight the most important findings with clear explanations and real-world examples
-- Create a narrative arc that shows the evolution or progression of ideas across papers
-- Use storytelling techniques (analogies, metaphors, everyday examples)
-- Include specific details and numbers, but explain what they mean in practical terms
-- Reference specific papers by author/institution to show connections: "The Stanford team found X, which the MIT researchers then used to..."
-- End with implications and future directions that listeners can easily understand
-- Be conversational and friendly (written for speaking, not reading)
-- Avoid academic or overly complex vocabulary
-
-Format the output as:
-# Podcast Script: [Catchy, Easy-to-Understand Title]
-
-## Opening Hook (30 seconds)
-[Engaging introduction that immediately connects to everyday life]
-
-## Context & Background (2-3 minutes)
-[Explain the research area using simple language and relatable examples. Introduce how these papers connect to each other.]
-
-## Key Findings (5-8 minutes)
-[Main insights explained simply with clear examples and analogies. WEAVE THE PAPERS TOGETHER:
-- Show how findings from different papers relate
-- Highlight agreements, disagreements, or complementary approaches
-- Use explicit connecting phrases between papers
-- Create a narrative that shows progression or evolution of ideas
-- Reference papers by author/institution to clarify connections]
-
-## Real-World Impact (2-3 minutes)
-[Practical applications explained in terms everyone can understand]
-
-## Closing & Future Outlook (1-2 minutes)
-[Wrap up with exciting future possibilities in accessible language]
-
----
-## Technical Notes for Host
-[Brief notes on pronunciation, key terms simplified, paper references]
-"""
-
-            # Build content with all PDFs + prompt
-            contents = uploaded_files + [prompt]
-
-            # Generate the synthesis
-            response = self.gemini_client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=contents
+            # Update status to generating
+            await supabase_service.update(
+                "podcasts",
+                {"status": "generating"},
+                {"id": podcast_id}
             )
 
-            # Extract the podcast script
-            podcast_script = ""
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, 'text'):
-                    podcast_script += part.text
+            # Get podcast details
+            podcasts = await supabase_service.select(
+                "podcasts",
+                filters={"id": podcast_id}
+            )
+            if not podcasts:
+                raise ValueError("Podcast not found")
 
-            # Check token usage
-            usage = None
-            if hasattr(response, 'usage_metadata'):
-                usage = response.usage_metadata
+            podcast = podcasts[0]
+            pdf_links = podcast["pdf_links"]
+            topic = podcast["topic"]
 
-            # Get uploaded file names
-            uploaded_file_names = [f.name for f in uploaded_files]
+            # Step 1: Download and upload PDFs to Gemini Files API
+            uploaded_files = self.download_and_upload_pdfs(pdf_links)
 
-            return {
-                'podcast_script': podcast_script,
-                'pdf_links': pdf_links,
-                'topic': topic,
-                'uploaded_files': uploaded_file_names,
-                'usage': str(usage) if usage else None,
-                'timestamp': datetime.now().isoformat()
-            }
+            # Step 2: Generate script with Gemini using uploaded PDF files
+            script = await gemini_service.generate_podcast_script_from_pdfs(
+                uploaded_files=uploaded_files,
+                topic=topic,
+                difficulty_level=podcast.get("difficulty_level", "intermediate")
+            )
 
-        except Exception as error:
-            raise Exception(f'Error synthesizing papers: {error}')
+            # Update podcast with script
+            title = script.get("metadata", {}).get("title", f"Podcast: {topic}")
+            summary = script.get("metadata", {}).get("summary", "")
+
+            await supabase_service.update(
+                "podcasts",
+                {
+                    "title": title,
+                    "summary": summary,
+                    "script_json": script
+                },
+                {"id": podcast_id}
+            )
+
+            # Create segments and generate audio
+            segments = script.get("segments", [])
+            total_duration = 0
+
+            for segment_data in segments:
+                segment = await self._create_segment(podcast_id, segment_data)
+                if segment and segment.get("duration_seconds"):
+                    total_duration += segment["duration_seconds"]
+
+            # Update final status
+            await supabase_service.update(
+                "podcasts",
+                {
+                    "status": "ready",
+                    "total_duration_seconds": int(total_duration)
+                },
+                {"id": podcast_id}
+            )
+
+        except Exception as e:
+            # Update status to failed
+            await supabase_service.update(
+                "podcasts",
+                {
+                    "status": "failed",
+                    "error_message": str(e)
+                },
+                {"id": podcast_id}
+            )
+            raise
+
+    async def _create_segment(self, podcast_id: str, segment_data: dict) -> Optional[dict]:
+        """Create a segment and generate its audio."""
+        dialogue = segment_data.get("dialogue", [])
+
+        # Generate audio for segment
+        segment_id = f"{podcast_id}_{segment_data.get('id', 0)}"
+
+        try:
+            audio_url = await elevenlabs_service.generate_segment_audio(
+                dialogue=dialogue,
+                segment_id=segment_id
+            )
+        except Exception as e:
+            print(f"Audio generation failed for segment: {e}")
+            audio_url = None
+
+        # Estimate duration (rough: 150 words per minute)
+        total_words = sum(len(line.get("text", "").split()) for line in dialogue)
+        duration_seconds = (total_words / 150) * 60
+
+        segment_record = {
+            "podcast_id": podcast_id,
+            "sequence": segment_data.get("id", 0),
+            "topic_label": segment_data.get("topic_label"),
+            "dialogue": dialogue,
+            "key_terms": segment_data.get("key_terms", []),
+            "difficulty_level": segment_data.get("difficulty_level"),
+            "audio_url": audio_url,
+            "duration_seconds": duration_seconds,
+            "transition_to_question": segment_data.get("transition_to_question"),
+            "resume_phrase": segment_data.get("resume_phrase")
+        }
+
+        return await supabase_service.insert("segments", segment_record)
+
+    async def get_podcast_with_segments(self, podcast_id: str) -> Optional[dict]:
+        """Get podcast with all its segments."""
+        podcasts = await supabase_service.select(
+            "podcasts",
+            filters={"id": podcast_id}
+        )
+        if not podcasts:
+            return None
+
+        podcast = podcasts[0]
+
+        # Get segments
+        segments = await supabase_service.select(
+            "segments",
+            filters={"podcast_id": podcast_id}
+        )
+
+        # Sort by sequence
+        segments = sorted(segments, key=lambda x: x.get("sequence", 0))
+
+        podcast["segments"] = segments
+        return podcast
+
+
+podcast_service = PodcastService()

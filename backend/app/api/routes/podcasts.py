@@ -1,99 +1,252 @@
 """
-Podcast Synthesis API Routes
+Podcast API Routes
+Merged: Uses pdf_links with Gemini Files API + Segment system from main
 """
 
-from fastapi import APIRouter, HTTPException, status, BackgroundTasks
-from typing import Dict, Any
-import os
-from datetime import datetime
+from __future__ import annotations
+import asyncio
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi.responses import FileResponse
+from pathlib import Path
+from typing import List
 
 from app.schemas.podcast import (
-    PodcastSynthesisRequest,
-    PodcastSynthesisResponse,
-    PodcastErrorResponse
+    PodcastGenerateRequest,
+    PodcastResponse,
+    PodcastListResponse,
+    PodcastStatusResponse,
+    SegmentResponse,
+    DialogueLine
 )
-from app.services.podcast_service import PodcastSynthesisService
-from app.config import get_settings
+from app.services.podcast_service import podcast_service
+from app.services.supabase_service import supabase_service
+from app.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/podcasts", tags=["podcasts"])
-settings = get_settings()
-
-# Initialize service
-podcast_service = PodcastSynthesisService()
 
 
-def save_podcast_script_to_file(podcast_script: str, topic: str) -> str:
+def _format_podcast_response(podcast: dict, include_segments: bool = False) -> PodcastResponse:
+    """Format podcast dict to response model."""
+    segments = []
+    if include_segments and "segments" in podcast:
+        for seg in podcast["segments"]:
+            dialogue = [
+                DialogueLine(
+                    speaker=line.get("speaker", "host"),
+                    text=line.get("text", ""),
+                    audio_url=line.get("audio_url")
+                )
+                for line in seg.get("dialogue", [])
+            ]
+            segments.append(SegmentResponse(
+                id=seg["id"],
+                sequence=seg.get("sequence", 0),
+                topic_label=seg.get("topic_label"),
+                dialogue=dialogue,
+                key_terms=seg.get("key_terms", []),
+                difficulty_level=seg.get("difficulty_level"),
+                audio_url=seg.get("audio_url"),
+                duration_seconds=seg.get("duration_seconds"),
+                transition_to_question=seg.get("transition_to_question"),
+                resume_phrase=seg.get("resume_phrase")
+            ))
+
+    return PodcastResponse(
+        id=podcast["id"],
+        title=podcast["title"],
+        summary=podcast.get("summary"),
+        topic=podcast.get("topic"),
+        pdf_links=podcast.get("pdf_links", []),
+        status=podcast["status"],
+        total_duration_seconds=podcast.get("total_duration_seconds"),
+        error_message=podcast.get("error_message"),
+        created_at=podcast["created_at"],
+        segments=segments
+    )
+
+
+@router.post("/generate", response_model=PodcastResponse)
+async def generate_podcast(
+    request: PodcastGenerateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Save podcast script to a markdown file
-    """
-    os.makedirs(settings.audio_storage_path, exist_ok=True)
-
-    timestamp = datetime.now().isoformat().replace(':', '-').replace('.', '-')
-    safe_topic = topic.replace(' ', '_').replace('/', '_')[:50] if topic else 'general'
-    filename = f'{settings.audio_storage_path}/podcast_script_{safe_topic}_{timestamp}.md'
-
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write(podcast_script)
-
-    return filename
-
-
-@router.post("/synthesize", response_model=PodcastSynthesisResponse)
-async def synthesize_podcast(
-    request: PodcastSynthesisRequest,
-    background_tasks: BackgroundTasks
-) -> PodcastSynthesisResponse:
-    """
-    Synthesize multiple arXiv papers into a podcast script using Gemini AI.
-
+    Start podcast generation from arXiv PDF links.
+    
     - **pdf_links**: List of arXiv PDF URLs to synthesize (1-10 papers)
-    - **topic**: Optional topic/context for the synthesis
-
-    The process:
-    1. Downloads PDFs from arXiv
-    2. Uploads them to Gemini Files API for processing
-    3. Uses Gemini to synthesize into a cohesive podcast script
-    4. Returns the script with metadata
-
-    **Note:** This endpoint may take 30-90 seconds to complete depending on the number and size of PDFs.
+    - **topic**: Topic/context for the podcast
+    - **difficulty_level**: beginner, intermediate, or advanced
+    
+    Returns immediately, generation happens in background.
+    Use GET /{podcast_id}/status to poll for completion.
     """
-    try:
-        result = podcast_service.synthesize_papers_to_podcast(
-            pdf_links=request.pdf_links,
-            topic=request.topic
-        )
+    # Create podcast record
+    podcast = await podcast_service.create_podcast(
+        pdf_links=request.pdf_links,
+        topic=request.topic,
+        difficulty_level=request.difficulty_level,
+        user_id=current_user.id
+    )
 
-        # Optionally save to file in background
-        if result.get('podcast_script'):
-            filename = save_podcast_script_to_file(
-                result['podcast_script'],
-                request.topic
-            )
-            result['filename'] = filename
+    # Start generation in background
+    background_tasks.add_task(
+        podcast_service.generate_podcast,
+        podcast["id"]
+    )
 
-        return PodcastSynthesisResponse(
-            success=True,
-            podcast_script=result['podcast_script'],
-            pdf_links=result['pdf_links'],
-            topic=result['topic'],
-            uploaded_files=result['uploaded_files'],
-            tokens_used=result.get('usage'),
-            timestamp=result['timestamp']
-        )
+    return _format_podcast_response(podcast)
 
-    except Exception as e:
+
+@router.get("", response_model=PodcastListResponse)
+async def list_podcasts(current_user: dict = Depends(get_current_user)):
+    """List all podcasts for the current user."""
+    podcasts = await supabase_service.select(
+        "podcasts",
+        filters={"user_id": current_user.id}
+    )
+
+    return PodcastListResponse(
+        podcasts=[_format_podcast_response(p) for p in podcasts],
+        total=len(podcasts)
+    )
+
+
+@router.get("/{podcast_id}", response_model=PodcastResponse)
+async def get_podcast(
+    podcast_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get podcast with all segments."""
+    podcast = await podcast_service.get_podcast_with_segments(podcast_id)
+
+    if not podcast:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Podcast not found"
         )
 
+    # Verify ownership
+    if podcast.get("user_id") != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
 
-@router.get("/health")
-async def podcast_health_check() -> Dict[str, str]:
-    """
-    Health check for the podcast synthesis service
-    """
+    return _format_podcast_response(podcast, include_segments=True)
+
+
+@router.get("/{podcast_id}/status", response_model=PodcastStatusResponse)
+async def get_podcast_status(
+    podcast_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get podcast generation status (for polling)."""
+    podcasts = await supabase_service.select(
+        "podcasts",
+        filters={"id": podcast_id}
+    )
+
+    if not podcasts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Podcast not found"
+        )
+
+    podcast = podcasts[0]
+
+    if podcast.get("user_id") != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    return PodcastStatusResponse(
+        id=podcast["id"],
+        status=podcast["status"],
+        error_message=podcast.get("error_message")
+    )
+
+
+@router.get("/{podcast_id}/audio/{segment_sequence}")
+async def get_segment_audio(
+    podcast_id: str,
+    segment_sequence: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Stream audio for a specific segment."""
+    # Verify ownership
+    podcasts = await supabase_service.select(
+        "podcasts",
+        filters={"id": podcast_id}
+    )
+    if not podcasts or podcasts[0].get("user_id") != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Get segment
+    segments = await supabase_service.select(
+        "segments",
+        filters={"podcast_id": podcast_id}
+    )
+
+    segment = next(
+        (s for s in segments if s.get("sequence") == segment_sequence),
+        None
+    )
+
+    if not segment or not segment.get("audio_url"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Segment audio not found"
+        )
+
+    audio_path = Path(segment["audio_url"])
+    if not audio_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio file not found"
+        )
+
+    return FileResponse(
+        audio_path,
+        media_type="audio/mpeg",
+        filename=f"segment_{segment_sequence}.mp3"
+    )
+
+
+@router.delete("/{podcast_id}")
+async def delete_podcast(
+    podcast_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a podcast and its segments."""
+    podcasts = await supabase_service.select(
+        "podcasts",
+        filters={"id": podcast_id}
+    )
+
+    if not podcasts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Podcast not found"
+        )
+
+    if podcasts[0].get("user_id") != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    # Segments will be deleted via CASCADE
+    await supabase_service.delete("podcasts", filters={"id": podcast_id})
+
+    return {"status": "deleted"}
+
+
+@router.get("/health", tags=["health"])
+async def podcast_health_check():
+    """Health check for the podcast service."""
     return {
-        "service": "podcast-synthesis",
+        "service": "podcast",
         "status": "healthy"
     }

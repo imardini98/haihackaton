@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
-from app.api.routes import auth, health, arxiv, podcasts
+from app.api.routes import auth, health, papers, podcasts, interaction, arxiv
 
 
 @asynccontextmanager
@@ -40,8 +40,9 @@ def create_app() -> FastAPI:
     # Routes
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
-    app.include_router(arxiv.router, prefix="/api/v1")
+    app.include_router(papers.router, prefix="/api/v1")
     app.include_router(podcasts.router, prefix="/api/v1")
+    app.include_router(interaction.router, prefix="/api/v1")
 
     @app.get("/")
     async def root():

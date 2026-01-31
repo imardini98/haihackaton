@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = True
     cors_origins: str = '["http://localhost:3000","http://localhost:5173"]'
+    auth_enabled: bool = False  # Set to True to require auth on endpoints
 
     # Audio Config
     audio_storage_path: str = "./audio_files"

@@ -21,3 +21,15 @@ class AuthResponse(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordResetResponse(BaseModel):
+    message: str
+
+
+class PasswordUpdateRequest(BaseModel):
+    new_password: str
