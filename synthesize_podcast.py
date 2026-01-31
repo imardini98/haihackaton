@@ -102,7 +102,7 @@ def synthesize_papers_to_podcast(pdf_links: List[str], topic: str = "") -> dict:
         uploaded_files = download_and_upload_pdfs(pdf_links)
         
         # Step 2: Create the synthesis prompt
-        prompt = f"""You are an expert science communicator creating a podcast script.
+        prompt = f"""You are an expert science communicator creating a podcast script that makes research accessible to everyone.
 
 I have provided {len(pdf_links)} research papers from arXiv as PDF documents.
 
@@ -111,39 +111,65 @@ I have provided {len(pdf_links)} research papers from arXiv as PDF documents.
 Your task is to:
 1. Read and understand all {len(pdf_links)} papers thoroughly
 2. Identify the common themes and key insights
-3. Synthesize the information into a cohesive narrative
-4. Create an engaging podcast script (10-15 minutes when spoken)
+3. **Find the connections and relationships between the papers**
+4. Synthesize the information into a cohesive, interconnected narrative
+5. Create an engaging podcast script (10-15 minutes when spoken)
+
+CRITICAL GUIDELINES FOR ACCESSIBILITY:
+- Use simple, everyday language - write as if explaining to a curious friend
+- Replace technical jargon with plain language (e.g., "neural network" → "a computer system that learns like a brain")
+- When technical terms are necessary, immediately explain them in simple words
+- Break down complex ideas into smaller, easy-to-grasp concepts
+- Use analogies and real-world examples that everyone can relate to
+- Keep sentences short and clear
+- Include all important details, but explain them simply
+- Focus on what things DO rather than what they ARE
 
 The podcast script should:
-- Start with a compelling hook that explains why this research matters
-- Explain the key concepts in accessible language (avoid jargon, or explain it clearly)
-- Highlight the most important findings from across all papers
-- Connect the papers together showing how they relate
-- Use storytelling techniques (analogies, examples, real-world applications)
-- End with implications and future directions
-- Be conversational and engaging (written for speaking, not reading)
+- Start with a compelling hook that explains why this research matters in everyday terms
+- Explain the key concepts using simple, accessible language (imagine explaining to someone with no technical background)
+- **STRONGLY EMPHASIZE THE CONNECTIONS between papers:**
+  * Show how papers build on each other's ideas
+  * Highlight where papers agree or provide complementary perspectives
+  * Point out contrasting approaches or findings between papers
+  * Explain how together they tell a bigger story than individually
+  * Use explicit transition phrases: "This builds on...", "While the first paper showed X, the second paper takes it further...", "Interestingly, this contrasts with..."
+  * Weave papers together rather than presenting them sequentially
+- Highlight the most important findings with clear explanations and real-world examples
+- Create a narrative arc that shows the evolution or progression of ideas across papers
+- Use storytelling techniques (analogies, metaphors, everyday examples)
+- Include specific details and numbers, but explain what they mean in practical terms
+- Reference specific papers by author/institution to show connections: "The Stanford team found X, which the MIT researchers then used to..."
+- End with implications and future directions that listeners can easily understand
+- Be conversational and friendly (written for speaking, not reading)
+- Avoid academic or overly complex vocabulary
 
 Format the output as:
-# Podcast Script: [Catchy Title]
+# Podcast Script: [Catchy, Easy-to-Understand Title]
 
 ## Opening Hook (30 seconds)
-[Engaging introduction that grabs attention]
+[Engaging introduction that immediately connects to everyday life]
 
 ## Context & Background (2-3 minutes)
-[Explain the research area and why it matters]
+[Explain the research area using simple language and relatable examples. Introduce how these papers connect to each other.]
 
 ## Key Findings (5-8 minutes)
-[Main insights from the papers, woven together]
+[Main insights explained simply with clear examples and analogies. WEAVE THE PAPERS TOGETHER:
+- Show how findings from different papers relate
+- Highlight agreements, disagreements, or complementary approaches
+- Use explicit connecting phrases between papers
+- Create a narrative that shows progression or evolution of ideas
+- Reference papers by author/institution to clarify connections]
 
 ## Real-World Impact (2-3 minutes)
-[Practical applications and implications]
+[Practical applications explained in terms everyone can understand]
 
 ## Closing & Future Outlook (1-2 minutes)
-[Wrap up with exciting future possibilities]
+[Wrap up with exciting future possibilities in accessible language]
 
 ---
 ## Technical Notes for Host
-[Brief notes on pronunciation, key terms, paper references]
+[Brief notes on pronunciation, key terms simplified, paper references]
 """
 
         print('\n🤖 Gemini is reading and synthesizing the papers...')

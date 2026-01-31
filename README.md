@@ -141,7 +141,8 @@ See [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) for business details.
 ## Documentation
 
 - [Getting Started](./GETTING_STARTED.md) ⭐ START HERE - Python setup
-- [Python Migration Guide](./PYTHON_COMPLETE.md) 🐍 NEW - Python version complete!
+- [ArxivService API Reference](./ARXIV_SERVICE_API.md) 🆕 Service endpoints & dataclass
+- [Python Migration Guide](./PYTHON_COMPLETE.md) 🐍 Python version complete!
 - [arXiv Semantic Search - Full Docs](./ARXIV_SEMANTIC_SEARCH.md)
 - [Output Formats Guide](./OUTPUT_FORMATS.md) - Dual JSON output
 - [New Feature: Links-Only Output](./NEW_FEATURE_LINKS_OUTPUT.md) 🔗

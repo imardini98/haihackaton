@@ -1,7 +1,15 @@
 from __future__ import annotations
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
 import json
+
+# Find .env file (check backend directory first, then parent/root directory)
+_env_path = Path(".env")
+if not _env_path.exists():
+    _parent_env = Path(__file__).parent.parent.parent / ".env"
+    if _parent_env.exists():
+        _env_path = _parent_env
 
 
 class Settings(BaseSettings):
