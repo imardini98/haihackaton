@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import handIcon from 'figma:asset/bdf35d6b24794cdeb24a98a3abd20c56685812d5.png';
+import React, { useEffect, useState } from 'react';
+import handIcon from '../assets/bdf35d6b24794cdeb24a98a3abd20c56685812d5.png';
 
 interface HandRaiseAnimationProps {
   onComplete: () => void;

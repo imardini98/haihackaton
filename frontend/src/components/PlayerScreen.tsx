@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Hand, Shuffle, Repeat, ArrowLeft, MoreVertical } from 'lucide-react';
 import { QuestionModal } from './QuestionModal';
 import { AnswerModal } from './AnswerModal';

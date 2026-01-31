@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import logo from 'figma:asset/433dc299e6c56f79156becafd6df63c758f567fc.png';
+import React, { useState } from 'react';
+import logo from '../assets/433dc299e6c56f79156becafd6df63c758f567fc.png';
 
 interface LandingScreenProps {
   onGeneratePodcast: (topic: string) => void;
