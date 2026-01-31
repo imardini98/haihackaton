@@ -16,14 +16,14 @@ export function LandingScreen({ onGeneratePodcast }: LandingScreenProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-16">
+    <div className="min-h-screen flex items-center justify-center px-6 py-12 md:py-16">
       <div className="w-full max-w-[640px] mx-auto text-center">
         {/* Logo */}
-        <div className="mb-8">
+        <div className="flex justify-center mb-8 md:mb-10">
           <img 
             src={logo} 
             alt="PodAsk Logo" 
-            className="max-h-48 md:max-h-56 w-auto mx-auto mb-6 object-contain"
+            className="h-20 md:h-24 w-auto object-contain"
           />
         </div>
 
