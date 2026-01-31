@@ -17,7 +17,7 @@ class GeminiService:
             if not settings.gemini_api_key:
                 raise RuntimeError("Gemini API key not configured")
             genai.configure(api_key=settings.gemini_api_key)
-            self._model = genai.GenerativeModel("gemini-1.5-pro")
+            self._model = genai.GenerativeModel("gemini-2.5-flash")
         return self._model
 
     async def generate_podcast_script(

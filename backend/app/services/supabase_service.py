@@ -49,6 +49,17 @@ class SupabaseService:
         response = self.client.auth.get_user(access_token)
         return response.user if response else None
 
+    async def reset_password_for_email(self, email: str) -> None:
+        """Send password reset email."""
+        self.client.auth.reset_password_for_email(email)
+
+    async def update_user_password(self, access_token: str, new_password: str) -> dict:
+        """Update user password (requires valid session from reset link)."""
+        # Set the session from the access token first
+        self.client.auth.set_session(access_token, "")
+        response = self.client.auth.update_user({"password": new_password})
+        return response.user if response else None
+
     # Database methods
     def table(self, table_name: str):
         """Get a table reference for queries."""
