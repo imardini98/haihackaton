@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PodAsk Backend Test</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>PodAsk Backend Test</h1>
+        <p>Quick UI to create a podcast, start segments, and raise hands.</p>
+      </header>
+
+      <section class="card">
+        <h2>API Base URL</h2>
+        <div class="row">
+          <label for="baseUrl">Base URL</label>
+          <input id="baseUrl" type="text" value="http://localhost:8000" />
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Create Session</h2>
+        <div class="row">
+          <label for="hostGender">Host gender</label>
+          <select id="hostGender">
+            <option value="">Random</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="expertGender">Expert gender</label>
+          <select id="expertGender">
+            <option value="">Random</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="hostVoiceId">Host voice ID (optional)</label>
+          <input id="hostVoiceId" type="text" placeholder="e.g. EST9Ui6982FZPSi7gCHi" />
+        </div>
+        <div class="row">
+          <label for="expertVoiceId">Expert voice ID (optional)</label>
+          <input id="expertVoiceId" type="text" placeholder="e.g. PoHUWWWMHFrA8z7Q88pu" />
+        </div>
+        <div class="row">
+          <label for="podcastJson">Podcast JSON</label>
+          <textarea id="podcastJson" rows="16"></textarea>
+        </div>
+        <div class="row actions">
+          <button id="createSessionBtn">Create Session</button>
+          <button id="getVoicesBtn">List Voices</button>
+        </div>
+        <div class="row">
+          <label>Session ID</label>
+          <div id="sessionId" class="mono">Not created</div>
+        </div>
+        <div class="row">
+          <label>Session Voices</label>
+          <div id="sessionVoices" class="mono">-</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Playback</h2>
+        <div class="row actions">
+          <button id="startSegmentBtn">Start Segment</button>
+          <button id="resumeBtn">Resume</button>
+        </div>
+        <div class="row">
+          <label for="segmentId">Segment ID (for audio)</label>
+          <input id="segmentId" type="number" value="1" min="1" />
+        </div>
+        <div class="row actions">
+          <button id="generateSegmentAudioBtn">Generate Segment Audio</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Raise Hand (Text)</h2>
+        <div class="row">
+          <label for="raiseHandText">Question</label>
+          <input id="raiseHandText" type="text" placeholder="What does the p-value mean here?" />
+        </div>
+        <div class="row actions">
+          <button id="raiseHandTextBtn">Raise Hand</button>
+          <button id="clarifyBtn">Request Clarification</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Provide Answer</h2>
+        <div class="row">
+          <label for="answerJson">Answer dialogue JSON</label>
+          <textarea id="answerJson" rows="8"></textarea>
+        </div>
+        <div class="row actions">
+          <button id="answerBtn">Send Answer</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Session State</h2>
+        <div class="row actions">
+          <button id="refreshStateBtn">Refresh State</button>
+          <button id="getSessionVoicesBtn">Get Session Voices</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Response Log</h2>
+        <pre id="log" class="log"></pre>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import audio
+from app.routes import podcast
 
 app = FastAPI(
     title="PodAsk AI",
@@ -25,6 +26,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(audio.router)
+app.include_router(podcast.router)
 
 
 @app.get("/")
