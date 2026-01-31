@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 import requests
 import pikepdf
@@ -24,11 +25,168 @@ GEMINI_MODEL = 'gemini-2.5-flash'
 PAGE_CHECK_WORKERS = 5
 
 
+@dataclass
+class ArxivPaper:
+    """Data class for arXiv paper"""
+    arxiv_id: str
+    title: str
+    authors: List[str]
+    abstract: str
+    pdf_url: str
+    published_date: str
+    categories: List[str]
+
+
 class ArxivSemanticSearchService:
     """Service for semantic search on arXiv papers"""
 
     def __init__(self):
         self.gemini_client = genai.Client(api_key=settings.gemini_api_key)
+
+    def _parse_arxiv_entry(self, entry: ET.Element, namespaces: Dict[str, str]) -> Optional[ArxivPaper]:
+        """Parse a single arXiv entry into an ArxivPaper object"""
+        try:
+            entry_id = entry.find('atom:id', namespaces).text
+            if 'api/errors' in entry_id:
+                return None
+
+            arxiv_id = entry_id.split('/abs/')[-1]
+            
+            title = entry.find('atom:title', namespaces).text.strip().replace('\n', ' ')
+            
+            authors = entry.findall('atom:author', namespaces)
+            author_list = [a.find('atom:name', namespaces).text for a in authors]
+            
+            abstract = entry.find('atom:summary', namespaces).text.strip().replace('\n', ' ')
+            
+            published = entry.find('atom:published', namespaces).text
+            
+            categories = [cat.get('term') for cat in entry.findall('atom:category', namespaces)]
+            
+            return ArxivPaper(
+                arxiv_id=arxiv_id,
+                title=title,
+                authors=author_list,
+                abstract=abstract,
+                pdf_url=f'http://arxiv.org/pdf/{arxiv_id}',
+                published_date=published,
+                categories=categories
+            )
+        except Exception:
+            return None
+
+    async def search(
+        self,
+        query: str,
+        max_results: int = 10,
+        sort_by: str = "submitted"
+    ) -> List[ArxivPaper]:
+        """
+        Search arXiv for papers
+        
+        Args:
+            query: Search query (can be simple text or arXiv query syntax)
+            max_results: Maximum number of results
+            sort_by: Sort order (submitted, relevance, updated)
+            
+        Returns:
+            List of ArxivPaper objects
+        """
+        sort_by_map = {
+            "submitted": "submittedDate",
+            "relevance": "relevance",
+            "updated": "lastUpdatedDate"
+        }
+        
+        # Check if query already contains arXiv operators
+        arxiv_operators = ['ti:', 'abs:', 'au:', 'cat:', 'all:', 'AND', 'OR', 'ANDNOT']
+        has_operators = any(op in query for op in arxiv_operators)
+        
+        # Only add 'all:' prefix if query doesn't have operators
+        search_query = query if has_operators else f'all:{query}'
+        
+        params = {
+            'search_query': search_query,
+            'start': 0,
+            'max_results': max_results,
+            'sortBy': sort_by_map.get(sort_by, "submittedDate"),
+            'sortOrder': 'descending'
+        }
+
+        try:
+            response = requests.get(ARXIV_API_BASE, params=params, timeout=30)
+            response.raise_for_status()
+
+            root = ET.fromstring(response.content)
+            namespaces = {
+                'atom': 'http://www.w3.org/2005/Atom',
+                'arxiv': 'http://arxiv.org/schemas/atom'
+            }
+
+            entries = root.findall('atom:entry', namespaces)
+            
+            papers = []
+            for entry in entries:
+                paper = self._parse_arxiv_entry(entry, namespaces)
+                if paper:
+                    papers.append(paper)
+                    
+            return papers
+
+        except Exception as error:
+            raise Exception(f'Error searching arXiv: {error}')
+
+    async def get_by_id(self, arxiv_id: str) -> Optional[ArxivPaper]:
+        """
+        Get a single paper by arXiv ID
+        
+        Args:
+            arxiv_id: The arXiv ID (e.g., "2301.07041")
+            
+        Returns:
+            ArxivPaper object or None if not found
+        """
+        params = {
+            'id_list': arxiv_id,
+            'max_results': 1
+        }
+
+        try:
+            response = requests.get(ARXIV_API_BASE, params=params, timeout=30)
+            response.raise_for_status()
+
+            root = ET.fromstring(response.content)
+            namespaces = {
+                'atom': 'http://www.w3.org/2005/Atom',
+                'arxiv': 'http://arxiv.org/schemas/atom'
+            }
+
+            entries = root.findall('atom:entry', namespaces)
+            if not entries:
+                return None
+                
+            return self._parse_arxiv_entry(entries[0], namespaces)
+
+        except Exception as error:
+            raise Exception(f'Error fetching paper {arxiv_id}: {error}')
+
+    async def get_paper_content(self, arxiv_id: str) -> str:
+        """
+        Get the content/abstract of a paper by arXiv ID
+        
+        For now, this returns the abstract. In the future, this could be enhanced
+        to fetch and parse the full PDF content.
+        
+        Args:
+            arxiv_id: The arXiv ID
+            
+        Returns:
+            Paper content (currently just the abstract)
+        """
+        paper = await self.get_by_id(arxiv_id)
+        if paper:
+            return paper.abstract
+        return ""
 
     def refine_user_query(self, user_query: str, user_context: str = '') -> Dict[str, Any]:
         """
@@ -421,3 +579,7 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
                 'error': 'Search failed',
                 'message': str(error)
             }
+
+
+# Create singleton instance
+arxiv_service = ArxivSemanticSearchService()

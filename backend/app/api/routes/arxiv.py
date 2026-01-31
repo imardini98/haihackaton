@@ -12,12 +12,9 @@ from app.schemas.arxiv import (
     PaperSummary,
     RefinedQuery
 )
-from app.services.arxiv_service import ArxivSemanticSearchService
+from app.services.arxiv_service import arxiv_service
 
 router = APIRouter(prefix="/arxiv", tags=["arxiv"])
-
-# Initialize service
-arxiv_service = ArxivSemanticSearchService()
 
 
 @router.post("/search", response_model=ArxivSearchResponse)
