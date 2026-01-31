@@ -1,103 +1,184 @@
-Slide 1 – The Market Problem
+# PodAsk – Pitch Deck
 
-Headline (large):
-Students are overwhelmed by information — not understanding.
+**From Passive Listening to Interactive Understanding**
 
-Content (short bullets):
+---
 
-Target users: University students (Bachelor, Master, PhD), especially STEM, medicine, economics
+## 1. Cover
 
-Academic literature is dense and time-consuming
+### PodAsk
 
-Podcasts are passive and ask the host’s questions
+**From Passive Listening to Interactive Understanding**
 
-Many niche or new topics have no podcast
+- An AI-driven system making podcasts interactive  
+- Turning hard-to-reach academic content into engaging dialogue  
 
-Students finish learning with unanswered questions
+---
 
-Footer insight (small):
-Information exists. Understanding does not.
+## 2. The Problem: Academic Content Is Hard to Access
 
-Slide 2 – The Solution
+**Dense material vs. modern learning needs**
 
-Headline (large):
-A podcast built around your curiosity.
+- **Reality:** Students are confronted with massive amounts of academic material that is time-consuming and exhausting to consume.
+- **Hurdle:** Content is locked in rigid, text-heavy formats that don’t match how people learn today.
+- **Consequence:** Low motivation, shallow engagement, and avoidance of learning altogether.
 
-One-sentence description:
-PodAsk turns any topic or question into a podcast you can interrupt and question in real time.
+**Core Problem:**  
+> “I don’t want to go through all this hard-to-reach academic stuff.  
+> I want something easily digestible — and interactive.”
 
-Supporting bullets:
+---
 
-User starts with a topic or a general question
+## 3. The Solution: From Static Text to Interactive Dialogue
 
-PodAsk generates a guided podcast explanation
+PodAsk transforms academic content into **interactive podcasts**.
 
-Users interrupt anytime to ask deeper questions
+- **Transformation:** Static PDFs → Dynamic audio  
+- **Simplification:** Complex → Clear  
+- **Interactivity:** Listen → Interrupt → Ask  
+- **Result:** Real understanding instead of passive consumption  
 
-Listening continues seamlessly
+Learning shifts from reading *about* something to actively engaging *with* it.
 
-Tagline (small):
-From listening → to understanding.
+---
 
-Slide 3 – Business Model
+## 4. Business Model
 
-Headline (large):
-People pay for understanding.
+**Students pay for time and understanding**
 
-Content (3 simple blocks):
+### Pricing & Value
+- €10–15 per month
+- Significant time savings
+- Reduced frustration and cognitive overload
 
-Who pays: Students & lifelong learners
+### Economics
+- €144 yearly revenue per user
+- AI-first product with **high margins**
 
-Pricing: €10–15 per month subscription
+### Market Potential
+- €33.8M ARR potential
+- Large Total Addressable Market in education and lifelong learning
 
-Unit economics:
+---
 
-Revenue ~€12 / user / month
+## 5. Go-To-Market
 
-Costs ~€2–4 / user / month
+**Direct access to students with a strong demo effect**
 
-Footer note:
-Simple subscription. No ads.
+- **Acquisition:**  
+  Seminars, live demos, partnerships with educational institutions
+- **The “Aha-Moment”:**  
+  Immediate value through  
+  **Listen → Interrupt → Ask**
+- **Viral Potential:**  
+  Strong “wow” effect when experienced live
 
-Slide 4 – Go-to-Market
+---
 
-Headline (large):
-How we get our first users.
+## 6. Why Now?
 
-Content (bullets):
+**The perfect timing for interactive learning**
 
-Direct outreach to students and PhD candidates
+- **Content Explosion:** Massive growth in academic papers and learning material
+- **Processing Problem:** Students are overwhelmed by volume and complexity
+- **AI Maturity:** Real-time synthesis and generation are now possible
+- **Audio-First Trend:** Learning on the go has become mainstream
 
-Live demos in seminars and study groups
+---
 
-Shareable “Try your topic” links
+## 7. Competitive Advantage
 
-Why users switch (highlighted):
+**PodAsk vs. NotebookLM**
 
-No existing tool lets students listen, interrupt, and ask their own questions while learning
+While existing tools focus on summarization, PodAsk goes further:
 
-Slide 5 – Why Us / Why Now
+- Audio-first interaction
+- Generative dialogue from text
+- Real-time spoken feedback
+- Voice-based learning companion
 
-Headline (large):
-Why now. Why us.
+**Key Insight:**  
+PodAsk transforms static text into dynamic, interactive audio dialogue, enabling deeper auditory learning and engagement beyond traditional note-taking or summarization tools.
 
-Two-column layout:
+---
 
-Why now
+## 8. Product Vision
 
-Explosion of research and complexity
+**From Students to Lifelong Learning**
 
-Students overloaded, not under-informed
+### Students (Year 1)
+- Academic focus
+- Interactive study guides
+- AI tutoring support
 
-Real-time synthesis is now possible
+### Professionals (Year 2–3)
+- Career development tools
+- Industry-specific knowledge
+- Networking and mentoring integration
 
-Why us
+### Global Platform (Year 4+)
+- Lifelong learning ecosystem
+- Cross-border collaboration
+- AI-driven personal growth pathways
 
-Working prototype built in under 48 hours
+---
 
-Clear focus on one core learning experience
+## 9. Traction & Milestones
 
-Strong belief in curiosity-driven education
+### Past Achievements
+- Working prototype
+- User tests
+- Clear product vision
+- Committed, complementary team
 
-Closing statement (bold):
-We would work on this full-time if it gains traction.
+### Present Milestones
+- First users
+- Paying customers
+- Initial partnerships
+
+### Future Needs
+- Funding
+- Access to institutions and users
+- Mentoring and strategic guidance
+
+---
+
+## 10. The Team
+
+**Capable and committed**
+
+- **Kevin** – Product direction, USP, pitch & demo  
+- **Sam** – Autonomous research, synthesis, Q&A logic  
+- **Rajn** – Audio generation (ElevenLabs)  
+- **Ivan** – Interaction logic, latency, audio playback  
+- **Florian** – Branding, UI/UX, experience clarity  
+
+---
+
+## 11. Call to Action
+
+**Help us build the future of learning**
+
+### Wanted
+- Feedback
+- Access
+- Support
+
+### Offer
+- Early access
+- Influence on product direction
+
+### Action
+**Try PodAsk now.**
+
+---
+
+## 12. Closing
+
+### PodAsk
+
+**The future of learning is interactive.**
+
+Thank you.  
+Ready for questions.
+
