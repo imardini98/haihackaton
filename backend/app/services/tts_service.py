@@ -6,13 +6,14 @@ Converts text content into high-quality podcast audio
 import uuid
 from pathlib import Path
 from elevenlabs import ElevenLabs, VoiceSettings
-from app.config import settings
+from app.config import get_settings
 
 
 class TTSService:
     def __init__(self):
-        self.client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
-        self.output_dir = settings.AUDIO_OUTPUT_DIR
+        settings = get_settings()
+        self.client = ElevenLabs(api_key=settings.elevenlabs_api_key)
+        self.output_dir = settings.audio_output_path
     
     def generate_audio(
         self,

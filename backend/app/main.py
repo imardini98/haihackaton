@@ -1,6 +1,6 @@
 """
 PodAsk AI Backend
-Main FastAPI application
+Main FastAPI application - Matches CLAUDE.md structure
 """
 
 from fastapi import FastAPI
@@ -8,8 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
-from app.api.routes import auth, health
-from app.routes import audio, podcast
+from app.api.routes import auth, health, podcasts, interaction, audio_files
 
 
 @asynccontextmanager
@@ -43,13 +42,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # API Routes (from main branch)
-    app.include_router(health.router, prefix="/api/v1")
-    app.include_router(auth.router, prefix="/api/v1")
-    
-    # Audio Pipeline Routes (from our branch)
-    app.include_router(audio.router)
-    app.include_router(podcast.router)
+    # API v1 Routes (CLAUDE.md structure)
+    app.include_router(health.router, prefix="/api/v1/health")
+    app.include_router(auth.router, prefix="/api/v1/auth")
+    app.include_router(podcasts.router, prefix="/api/v1")
+    app.include_router(interaction.router, prefix="/api/v1")
+    app.include_router(audio_files.router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
@@ -62,6 +60,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health_check():
+        """Legacy health endpoint"""
         return {"status": "healthy"}
 
     return app

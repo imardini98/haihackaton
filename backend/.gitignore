@@ -19,6 +19,9 @@ audio_files/*.wav
 *.mp3
 *.wav
 
+# Old route files (deprecated)
+app/routes/
+
 # IDE
 .vscode/
 .idea/

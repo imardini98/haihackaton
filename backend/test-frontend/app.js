@@ -187,12 +187,12 @@ createSessionBtn.addEventListener("click", async () => {
       expert_voice_id: expertVoiceIdInput.value || null,
     };
 
-    const data = await request("/podcast/session", {
+    const data = await request("/api/v1/podcasts/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    setSession(data.session_id, data.voices);
+    setSession(data.id, data.voices);
     log(data);
   } catch (err) {
     log(`Error: ${err.message}`);
@@ -201,7 +201,7 @@ createSessionBtn.addEventListener("click", async () => {
 
 getVoicesBtn.addEventListener("click", async () => {
   try {
-    const data = await request("/podcast/voices");
+    const data = await request("/api/v1/audio/voices");
     log(data);
   } catch (err) {
     log(`Error: ${err.message}`);
@@ -211,7 +211,7 @@ getVoicesBtn.addEventListener("click", async () => {
 startSegmentBtn.addEventListener("click", async () => {
   try {
     const sessionId = requireSession();
-    const data = await request(`/podcast/session/${sessionId}/start`, {
+    const data = await request(`/api/v1/podcasts/session/${sessionId}/start`, {
       method: "POST",
     });
     log(data);
@@ -226,10 +226,10 @@ raiseHandTextBtn.addEventListener("click", async () => {
     const question = raiseHandTextInput.value.trim();
     if (!question) throw new Error("Please enter a question.");
 
-    const data = await request(`/podcast/session/${sessionId}/raise-hand`, {
+    const data = await request(`/api/v1/interaction/ask-text`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ session_id: sessionId, question }),
     });
     log(data);
   } catch (err) {
@@ -253,7 +253,7 @@ answerBtn.addEventListener("click", async () => {
   try {
     const sessionId = requireSession();
     const answerDialogue = parseJsonSafe(answerJsonInput.value);
-    const data = await request(`/podcast/session/${sessionId}/answer`, {
+    const data = await request(`/api/v1/interaction/${sessionId}/answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ answer_dialogue: answerDialogue }),
@@ -267,7 +267,7 @@ answerBtn.addEventListener("click", async () => {
 resumeBtn.addEventListener("click", async () => {
   try {
     const sessionId = requireSession();
-    const data = await request(`/podcast/session/${sessionId}/resume`, {
+    const data = await request(`/api/v1/interaction/continue?session_id=${sessionId}`, {
       method: "POST",
     });
     log(data);
@@ -279,7 +279,7 @@ resumeBtn.addEventListener("click", async () => {
 refreshStateBtn.addEventListener("click", async () => {
   try {
     const sessionId = requireSession();
-    const data = await request(`/podcast/session/${sessionId}`);
+    const data = await request(`/api/v1/podcasts/session/${sessionId}`);
     log(data);
   } catch (err) {
     log(`Error: ${err.message}`);
@@ -289,7 +289,7 @@ refreshStateBtn.addEventListener("click", async () => {
 getSessionVoicesBtn.addEventListener("click", async () => {
   try {
     const sessionId = requireSession();
-    const data = await request(`/podcast/session/${sessionId}/voices`);
+    const data = await request(`/api/v1/podcasts/session/${sessionId}/voices`);
     setSession(sessionId, data);
     log(data);
   } catch (err) {
@@ -302,7 +302,7 @@ generateSegmentAudioBtn.addEventListener("click", async () => {
     const sessionId = requireSession();
     const segmentId = segmentIdInput.value || "1";
     const data = await request(
-      `/podcast/session/${sessionId}/generate-segment-audio/${segmentId}`,
+      `/api/v1/podcasts/session/${sessionId}/generate-segment-audio/${segmentId}`,
       { method: "POST" }
     );
     log(data);
