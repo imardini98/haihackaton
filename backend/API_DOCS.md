@@ -312,6 +312,159 @@ Delete a podcast and its segments.
 
 ---
 
+### Interaction ("Raise Your Hand" Q&A)
+
+#### POST `/interaction/session/start` (Auth Required)
+Start a new listening session for a podcast.
+
+**Request:**
+```json
+{
+  "podcast_id": "podcast-uuid",
+  "segment_id": "segment-uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "session_id": "session-uuid",
+  "podcast_id": "podcast-uuid",
+  "current_segment_id": "segment-uuid",
+  "status": "playing"
+}
+```
+
+---
+
+#### POST `/interaction/session/{session_id}/update` (Auth Required)
+Update current position in listening session.
+
+**Request:**
+```json
+{
+  "current_segment_id": "segment-uuid",
+  "audio_timestamp": 45.5
+}
+```
+
+**Response:**
+```json
+{
+  "session_id": "session-uuid",
+  "status": "playing"
+}
+```
+
+---
+
+#### GET `/interaction/session/{session_id}` (Auth Required)
+Get session details.
+
+**Response:**
+```json
+{
+  "id": "session-uuid",
+  "podcast_id": "podcast-uuid",
+  "current_segment_id": "segment-uuid",
+  "status": "playing",
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+---
+
+#### POST `/interaction/ask` (Auth Required)
+Submit a voice question (audio file). Transcribes and processes.
+
+**Request:** `multipart/form-data`
+- `session_id`: string (query param)
+- `audio`: file (MP3/WAV)
+
+**Response:**
+```json
+{
+  "transcription": "How did they measure that?",
+  "is_question": true,
+  "is_continue_signal": false,
+  "exchange": {
+    "exchange_id": "uuid",
+    "host_acknowledgment": "Great question—",
+    "expert_answer": "They used a cross-validation approach...",
+    "host_audio_url": "/audio/qa_xxx_host.mp3",
+    "expert_audio_url": "/audio/qa_xxx_expert.mp3",
+    "confidence": "high",
+    "topics_discussed": ["validation", "metrics"]
+  }
+}
+```
+
+If user says "okay thanks" or similar:
+```json
+{
+  "transcription": "okay thanks",
+  "is_question": false,
+  "is_continue_signal": true,
+  "resume": {
+    "resume_line": "Alright, let's continue...",
+    "resume_audio_url": "/audio/resume_xxx.mp3",
+    "next_segment_id": "next-segment-uuid"
+  }
+}
+```
+
+---
+
+#### POST `/interaction/ask-text` (Auth Required)
+Submit a text question.
+
+**Request:**
+```json
+{
+  "session_id": "session-uuid",
+  "question": "How did they calculate the accuracy?",
+  "audio_timestamp": 45.5
+}
+```
+
+**Response:**
+```json
+{
+  "exchange_id": "uuid",
+  "host_acknowledgment": "Great question—",
+  "expert_answer": "The accuracy was calculated using...",
+  "host_audio_url": "/audio/qa_xxx_host.mp3",
+  "expert_audio_url": "/audio/qa_xxx_expert.mp3",
+  "confidence": "high",
+  "topics_discussed": ["accuracy", "metrics"]
+}
+```
+
+---
+
+#### POST `/interaction/continue` (Auth Required)
+Process continue signal and get resume line.
+
+**Request:**
+```json
+{
+  "session_id": "session-uuid",
+  "user_signal": "okay thanks"
+}
+```
+
+**Response:**
+```json
+{
+  "resume_line": "Alright, moving on to the results...",
+  "resume_audio_url": "/audio/resume_xxx.mp3",
+  "next_segment_id": "next-segment-uuid"
+}
+```
+
+---
+
 ### Health
 
 #### GET `/health`
@@ -340,6 +493,27 @@ Check status of external services.
 4. **Poll status:** `GET /podcasts/{id}/status` (wait for `"ready"`)
 5. **Get podcast:** `GET /podcasts/{id}` (get full podcast with segments)
 6. **Stream audio:** `GET /podcasts/{id}/audio/{sequence}` (play segment audio)
+
+---
+
+## "Raise Your Hand" Q&A Flow
+
+1. **Start session:** `POST /interaction/session/start` (when user starts playing)
+2. **User raises hand:** Frontend waits for current segment to finish
+3. **Play transition:** Play `transition_to_question` audio from segment
+4. **Open mic:** Record user's question
+5. **Submit question:** `POST /interaction/ask` (audio) or `POST /interaction/ask-text`
+6. **Play response:** Play `host_audio_url` then `expert_audio_url`
+7. **Listen for follow-up:** Keep mic open
+8. **Detect outcome:**
+   - User asks another question → repeat from step 5
+   - User says "okay thanks" / silence timeout → `POST /interaction/continue`
+9. **Resume podcast:** Play `resume_audio_url`, then next segment
+
+**Continue signals detected:**
+- "okay thanks", "got it", "continue", "thanks", "alright", "next", "move on"
+
+**Timeout:** 5 seconds of silence = auto-continue
 
 ---
 

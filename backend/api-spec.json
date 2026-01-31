@@ -727,6 +727,311 @@
                 }
             }
         },
+        "/api/v1/interaction/session/start": {
+            "post": {
+                "tags": [
+                    "interaction"
+                ],
+                "summary": "Start Session",
+                "description": "Start a new listening session for a podcast.",
+                "operationId": "start_session_api_v1_interaction_session_start_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SessionStartRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionStartResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/interaction/session/{session_id}/update": {
+            "post": {
+                "tags": [
+                    "interaction"
+                ],
+                "summary": "Update Session",
+                "description": "Update current position in listening session.",
+                "operationId": "update_session_api_v1_interaction_session__session_id__update_post",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Session Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SessionUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/interaction/ask": {
+            "post": {
+                "tags": [
+                    "interaction"
+                ],
+                "summary": "Ask Voice Question",
+                "description": "Submit a voice question (audio file). Transcribes and processes.",
+                "operationId": "ask_voice_question_api_v1_interaction_ask_post",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "session_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Session Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_ask_voice_question_api_v1_interaction_ask_post"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProcessVoiceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/interaction/ask-text": {
+            "post": {
+                "tags": [
+                    "interaction"
+                ],
+                "summary": "Ask Text Question",
+                "description": "Submit a text question.",
+                "operationId": "ask_text_question_api_v1_interaction_ask_text_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AskTextRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AskResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/interaction/continue": {
+            "post": {
+                "tags": [
+                    "interaction"
+                ],
+                "summary": "Continue Podcast",
+                "description": "Process continue signal and get resume line.",
+                "operationId": "continue_podcast_api_v1_interaction_continue_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContinueRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContinueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/interaction/session/{session_id}": {
+            "get": {
+                "tags": [
+                    "interaction"
+                ],
+                "summary": "Get Session",
+                "description": "Get session details.",
+                "operationId": "get_session_api_v1_interaction_session__session_id__get",
+                "security": [
+                    {
+                        "HTTPBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Session Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/": {
             "get": {
                 "summary": "Root",
@@ -795,6 +1100,87 @@
                 ],
                 "title": "ArxivPaperResponse"
             },
+            "AskResponse": {
+                "properties": {
+                    "exchange_id": {
+                        "type": "string",
+                        "title": "Exchange Id"
+                    },
+                    "host_acknowledgment": {
+                        "type": "string",
+                        "title": "Host Acknowledgment"
+                    },
+                    "expert_answer": {
+                        "type": "string",
+                        "title": "Expert Answer"
+                    },
+                    "host_audio_url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Host Audio Url"
+                    },
+                    "expert_audio_url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Expert Audio Url"
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "title": "Confidence",
+                        "default": "medium"
+                    },
+                    "topics_discussed": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Topics Discussed",
+                        "default": []
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "exchange_id",
+                    "host_acknowledgment",
+                    "expert_answer"
+                ],
+                "title": "AskResponse"
+            },
+            "AskTextRequest": {
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "title": "Session Id"
+                    },
+                    "question": {
+                        "type": "string",
+                        "title": "Question"
+                    },
+                    "audio_timestamp": {
+                        "type": "number",
+                        "title": "Audio Timestamp",
+                        "default": 0.0
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "question"
+                ],
+                "title": "AskTextRequest"
+            },
             "AuthResponse": {
                 "properties": {
                     "access_token": {
@@ -822,6 +1208,73 @@
                     "email"
                 ],
                 "title": "AuthResponse"
+            },
+            "Body_ask_voice_question_api_v1_interaction_ask_post": {
+                "properties": {
+                    "audio": {
+                        "type": "string",
+                        "format": "binary",
+                        "title": "Audio"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "audio"
+                ],
+                "title": "Body_ask_voice_question_api_v1_interaction_ask_post"
+            },
+            "ContinueRequest": {
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "title": "Session Id"
+                    },
+                    "user_signal": {
+                        "type": "string",
+                        "title": "User Signal",
+                        "default": "okay thanks"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "session_id"
+                ],
+                "title": "ContinueRequest"
+            },
+            "ContinueResponse": {
+                "properties": {
+                    "resume_line": {
+                        "type": "string",
+                        "title": "Resume Line"
+                    },
+                    "resume_audio_url": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Resume Audio Url"
+                    },
+                    "next_segment_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Next Segment Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "resume_line"
+                ],
+                "title": "ContinueResponse"
             },
             "DialogueLine": {
                 "properties": {
@@ -1213,6 +1666,49 @@
                 ],
                 "title": "PodcastStatusResponse"
             },
+            "ProcessVoiceResponse": {
+                "properties": {
+                    "transcription": {
+                        "type": "string",
+                        "title": "Transcription"
+                    },
+                    "is_question": {
+                        "type": "boolean",
+                        "title": "Is Question"
+                    },
+                    "is_continue_signal": {
+                        "type": "boolean",
+                        "title": "Is Continue Signal"
+                    },
+                    "exchange": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/AskResponse"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "resume": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ContinueResponse"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "transcription",
+                    "is_question",
+                    "is_continue_signal"
+                ],
+                "title": "ProcessVoiceResponse"
+            },
             "SegmentResponse": {
                 "properties": {
                     "id": {
@@ -1312,6 +1808,126 @@
                     "dialogue"
                 ],
                 "title": "SegmentResponse"
+            },
+            "SessionResponse": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id"
+                    },
+                    "podcast_id": {
+                        "type": "string",
+                        "title": "Podcast Id"
+                    },
+                    "current_segment_id": {
+                        "type": "string",
+                        "title": "Current Segment Id"
+                    },
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "title": "Created At"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "title": "Updated At"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "podcast_id",
+                    "current_segment_id",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "SessionResponse"
+            },
+            "SessionStartRequest": {
+                "properties": {
+                    "podcast_id": {
+                        "type": "string",
+                        "title": "Podcast Id"
+                    },
+                    "segment_id": {
+                        "type": "string",
+                        "title": "Segment Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "podcast_id",
+                    "segment_id"
+                ],
+                "title": "SessionStartRequest"
+            },
+            "SessionStartResponse": {
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "title": "Session Id"
+                    },
+                    "podcast_id": {
+                        "type": "string",
+                        "title": "Podcast Id"
+                    },
+                    "current_segment_id": {
+                        "type": "string",
+                        "title": "Current Segment Id"
+                    },
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "podcast_id",
+                    "current_segment_id",
+                    "status"
+                ],
+                "title": "SessionStartResponse"
+            },
+            "SessionUpdateRequest": {
+                "properties": {
+                    "current_segment_id": {
+                        "type": "string",
+                        "title": "Current Segment Id"
+                    },
+                    "audio_timestamp": {
+                        "type": "number",
+                        "title": "Audio Timestamp",
+                        "default": 0.0
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "current_segment_id"
+                ],
+                "title": "SessionUpdateRequest"
+            },
+            "SessionUpdateResponse": {
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "title": "Session Id"
+                    },
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "session_id",
+                    "status"
+                ],
+                "title": "SessionUpdateResponse"
             },
             "SignInRequest": {
                 "properties": {
