@@ -25,9 +25,9 @@ def find_generated_files():
     return sorted(files_to_delete)
 
 
-def get_file_size(filepath):
-    """Get human-readable file size"""
-    size = os.path.getsize(filepath)
+def format_size(size_bytes):
+    """Format bytes into human-readable size"""
+    size = float(size_bytes)
     
     for unit in ['B', 'KB', 'MB', 'GB']:
         if size < 1024.0:
@@ -35,6 +35,12 @@ def get_file_size(filepath):
         size /= 1024.0
     
     return f"{size:.1f} TB"
+
+
+def get_file_size(filepath):
+    """Get human-readable file size for a file"""
+    size = os.path.getsize(filepath)
+    return format_size(size)
 
 
 def clean_files(confirm=True):
@@ -62,7 +68,7 @@ def clean_files(confirm=True):
         total_size += size
         print(f'   {idx}. {file} ({get_file_size(file)})')
     
-    print(f'\n📊 Total size: {get_file_size(sum(os.path.getsize(f) for f in files))}')
+    print(f'\n📊 Total size: {format_size(total_size)}')
     
     # Ask for confirmation
     if confirm:
@@ -135,7 +141,7 @@ def list_files_only():
                 print(f'   • {item} ({get_file_size(item)})')
     
     total_size = sum(os.path.getsize(f) for f in files)
-    print(f'\n📊 Total size: {get_file_size(total_size)}')
+    print(f'\n📊 Total size: {format_size(total_size)}')
     print('=' * 80 + '\n')
 
 
