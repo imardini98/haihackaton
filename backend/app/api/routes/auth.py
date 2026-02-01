@@ -21,7 +21,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def sign_up(request: SignUpRequest):
     """Register a new user."""
     try:
-        response = await supabase_service.sign_up(request.email, request.password)
+        response = await supabase_service.sign_up(
+            email=request.email,
+            password=request.password,
+            first_name=request.first_name,
+            last_name=request.last_name
+        )
 
         if not response.user:
             raise HTTPException(
@@ -29,10 +34,15 @@ async def sign_up(request: SignUpRequest):
                 detail="Failed to create user"
             )
 
+        # Get user metadata
+        user_metadata = response.user.user_metadata or {}
+
         return AuthResponse(
             access_token=response.session.access_token if response.session else "",
             user_id=response.user.id,
-            email=response.user.email
+            email=response.user.email,
+            first_name=user_metadata.get("first_name"),
+            last_name=user_metadata.get("last_name")
         )
     except Exception as e:
         raise HTTPException(
@@ -53,10 +63,15 @@ async def sign_in(request: SignInRequest):
                 detail="Invalid credentials"
             )
 
+        # Get user metadata
+        user_metadata = response.user.user_metadata or {}
+
         return AuthResponse(
             access_token=response.session.access_token,
             user_id=response.user.id,
-            email=response.user.email
+            email=response.user.email,
+            first_name=user_metadata.get("first_name"),
+            last_name=user_metadata.get("last_name")
         )
     except Exception as e:
         raise HTTPException(
@@ -68,9 +83,14 @@ async def sign_in(request: SignInRequest):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Get current user profile."""
+    # Get user metadata for first_name and last_name
+    user_metadata = current_user.user_metadata or {}
+
     return UserResponse(
         id=current_user.id,
-        email=current_user.email
+        email=current_user.email,
+        first_name=user_metadata.get("first_name"),
+        last_name=user_metadata.get("last_name")
     )
 
 

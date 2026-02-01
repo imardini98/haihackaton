@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import logo from '../assets/433dc299e6c56f79156becafd6df63c758f567fc.png';
 import { ApiError } from '../api/http';
-import { signIn, type AuthResponse } from '../api/auth';
+import { signUp, type AuthResponse } from '../api/auth';
 
-interface LoginScreenProps {
-  onLogin: (session: AuthResponse) => void;
-  onCreateAccount?: () => void;
-  onForgotPassword?: () => void;
+interface SignupScreenProps {
+  onSignup: (session: AuthResponse) => void;
+  onBackToLogin?: () => void;
 }
 
 const ACCENT = '#F59E0B'; // matches the app's amber accent used elsewhere
@@ -15,15 +14,22 @@ const INPUT_BORDER_IDLE = 'rgba(255, 255, 255, 0.18)';
 const INPUT_BG = 'rgba(255, 255, 255, 0.10)';
 const INPUT_BG_SOFT = 'rgba(255, 255, 255, 0.06)';
 
-export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: LoginScreenProps) {
+export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit = useMemo(() => {
-    return email.trim().length > 0 && password.trim().length > 0;
-  }, [email, password]);
+    return (
+      firstName.trim().length > 0 &&
+      lastName.trim().length > 0 &&
+      email.trim().length > 0 &&
+      password.trim().length > 0
+    );
+  }, [firstName, lastName, email, password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,22 +38,23 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
-    if (!trimmedEmail || !trimmedPassword) {
-      setError('Please enter an email and password.');
+    if (!firstName.trim() || !lastName.trim() || !trimmedEmail || !trimmedPassword) {
+      setError('Please fill out all fields.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const session = await signIn({ email: trimmedEmail, password: trimmedPassword });
-      onLogin(session);
+      // Backend signup currently accepts {email,password}. First/last name is UI-only for now.
+      const session = await signUp({ email: trimmedEmail, password: trimmedPassword });
+      onSignup(session);
     } catch (e) {
       if (e instanceof ApiError) {
-        setError(e.message || 'Sign in failed.');
+        setError(e.message || 'Sign up failed.');
       } else if (e instanceof Error) {
-        setError(e.message || 'Sign in failed.');
+        setError(e.message || 'Sign up failed.');
       } else {
-        setError('Sign in failed.');
+        setError('Sign up failed.');
       }
     } finally {
       setIsSubmitting(false);
@@ -67,6 +74,40 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* First name (outlined) */}
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            autoComplete="given-name"
+            placeholder="First name"
+            disabled={isSubmitting}
+            className="w-full px-6 py-4 rounded-xl focus:outline-none transition-colors text-white placeholder:text-gray-400"
+            style={{
+              backgroundColor: INPUT_BG,
+              border: `2px solid ${INPUT_BORDER_IDLE}`,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = ACCENT)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = INPUT_BORDER_IDLE)}
+          />
+
+          {/* Last name (filled) */}
+          <input
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            autoComplete="family-name"
+            placeholder="Last name"
+            disabled={isSubmitting}
+            className="w-full px-6 py-4 rounded-xl focus:outline-none transition-colors text-white placeholder:text-gray-400"
+            style={{
+              backgroundColor: INPUT_BG_SOFT,
+              border: `2px solid ${INPUT_BORDER_IDLE}`,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = ACCENT)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = INPUT_BORDER_IDLE)}
+          />
+
           {/* Email (outlined) */}
           <input
             type="email"
@@ -89,7 +130,7 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete="new-password"
             placeholder="Password"
             disabled={isSubmitting}
             className="w-full px-6 py-4 rounded-xl focus:outline-none transition-colors text-white placeholder:text-gray-400"
@@ -100,20 +141,6 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
             onFocus={(e) => (e.currentTarget.style.borderColor = ACCENT)}
             onBlur={(e) => (e.currentTarget.style.borderColor = INPUT_BORDER_IDLE)}
           />
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="text-sm font-semibold transition-colors"
-              style={{ color: ACCENT }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = ACCENT_HOVER)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = ACCENT)}
-              onClick={onForgotPassword}
-              disabled={!onForgotPassword || isSubmitting}
-            >
-              Forgot your password?
-            </button>
-          </div>
 
           {error && (
             <div
@@ -139,59 +166,18 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
               if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = ACCENT;
             }}
           >
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
+            {isSubmitting ? 'Creating account…' : 'Create account'}
           </button>
 
           <div className="text-center pt-2">
             <button
               type="button"
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
-              onClick={onCreateAccount}
-              disabled={!onCreateAccount || isSubmitting}
+              onClick={onBackToLogin}
+              disabled={!onBackToLogin || isSubmitting}
             >
-              Create new account
+              Already have an account? Sign in
             </button>
-          </div>
-
-          <div className="text-center pt-6">
-            <div className="text-sm font-semibold mb-4" style={{ color: ACCENT }}>
-              Or continue with
-            </div>
-
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                aria-label="Continue with Google"
-                className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.14)', border: `1px solid ${INPUT_BORDER_IDLE}` }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.18)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
-              >
-                <span className="text-lg font-semibold text-white">G</span>
-              </button>
-
-              <button
-                type="button"
-                aria-label="Continue with Facebook"
-                className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.14)', border: `1px solid ${INPUT_BORDER_IDLE}` }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.18)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
-              >
-                <span className="text-lg font-semibold text-white">f</span>
-              </button>
-
-              <button
-                type="button"
-                aria-label="Continue with Apple"
-                className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.14)', border: `1px solid ${INPUT_BORDER_IDLE}` }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.18)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)')}
-              >
-                <span className="text-lg font-semibold text-white"></span>
-              </button>
-            </div>
           </div>
         </form>
       </div>
