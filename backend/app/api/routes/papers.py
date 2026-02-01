@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import Optional
 
@@ -16,6 +17,8 @@ from app.schemas.arxiv import (
 from app.services.arxiv_service import arxiv_service
 from app.services.supabase_service import supabase_service
 from app.api.dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -37,6 +40,8 @@ async def search_arxiv(request: ArxivSearchRequest):
     - PDF links for direct download
     - Excluded papers info (if any exceeded page limit)
     """
+    logger.info(f"POST /api/v1/papers/search - query: '{request.query}'")
+
     result = arxiv_service.semantic_search(
         user_query=request.query,
         user_context=request.context,
@@ -47,6 +52,7 @@ async def search_arxiv(request: ArxivSearchRequest):
 
     # Check for errors
     if 'error' in result:
+        logger.error(f"Search error: {result.get('message')}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=result.get('message', 'Unknown error occurred')
@@ -91,6 +97,8 @@ async def search_arxiv(request: ArxivSearchRequest):
         top_5_links=result['top_5_links'],
         excluded_papers=excluded_papers
     )
+
+    logger.info(f"Search successful - returning {len(top_papers)} papers")
 
 
 @router.post("/ingest", response_model=PaperResponse)

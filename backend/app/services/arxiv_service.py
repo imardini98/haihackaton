@@ -6,6 +6,7 @@ Powered by arXiv API + Google Gemini
 import json
 import time
 import io
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import xml.etree.ElementTree as ET
@@ -17,6 +18,13 @@ import pikepdf
 from google import genai
 
 from app.config import get_settings
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Configuration
 settings = get_settings()
@@ -192,6 +200,8 @@ class ArxivSemanticSearchService:
         """
         Step 1: Refine user query using Gemini
         """
+        logger.info(f"Step 1: Refining query - '{user_query}'")
+
         prompt = f"""Refine this arXiv search query.
 
 Query: "{user_query}"
@@ -236,9 +246,12 @@ Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": 
             )
 
             refined_data = json.loads(response.text)
+            logger.info(f"Query refined successfully: '{refined_data['refined_query']}'")
+            logger.info(f"Key concepts: {refined_data['key_concepts']}")
             return refined_data
 
         except Exception as error:
+            logger.warning(f"Failed to refine query with Gemini: {error}, using fallback")
             # Fallback to original query
             return {
                 'refined_query': f'all:{user_query}',
@@ -327,6 +340,8 @@ Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": 
         Returns:
             Tuple of (filtered_papers, excluded_papers)
         """
+        logger.info(f"Step 3: Checking PDF page counts (max: {max_pages} pages, {len(papers)} papers)")
+
         filtered_papers = []
         excluded_papers = []
 
@@ -351,6 +366,7 @@ Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": 
                     paper['page_count'] = None
                     filtered_papers.append(paper)
 
+        logger.info(f"Page filter complete: {len(filtered_papers)} kept, {len(excluded_papers)} excluded")
         return filtered_papers, excluded_papers
 
     def search_arxiv(
@@ -361,6 +377,8 @@ Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": 
         """
         Step 2: Search arXiv API with refined query
         """
+        logger.info(f"Step 2: Searching arXiv with query '{refined_query['refined_query']}' (max_results={max_results})")
+
         params = {
             'search_query': refined_query['refined_query'],
             'start': 0,
@@ -420,9 +438,11 @@ Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": 
 
                 papers.append(paper)
 
+            logger.info(f"Found {len(papers)} papers from arXiv")
             return papers
 
         except Exception as error:
+            logger.error(f"Error searching arXiv: {error}")
             raise Exception(f'Error searching arXiv: {error}')
 
     def rank_papers_with_gemini(
@@ -435,6 +455,8 @@ Output JSON: {{"refined_query": "...", "key_concepts": ["..."], "search_focus": 
         """
         Step 3: Use Gemini to classify and rank the papers
         """
+        logger.info(f"Step 4: Ranking {len(papers)} papers with Gemini (selecting top {top_n})")
+
         paper_summaries = [
             {
                 'index': paper['index'],
@@ -503,12 +525,15 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
                     }
                     top_papers.append(merged_paper)
 
+            logger.info(f"Ranked {len(top_papers)} papers successfully")
+            logger.info(f"Overall analysis: {ranking_data['overall_analysis'][:100]}...")
             return {
                 'top_papers': top_papers,
                 'overall_analysis': ranking_data['overall_analysis']
             }
 
         except Exception as error:
+            logger.warning(f"Failed to rank papers with Gemini: {error}, using arXiv order")
             # Fallback: return top N papers by order
             return {
                 'top_papers': papers[:top_n],
@@ -526,6 +551,11 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
         """
         Main function to orchestrate the semantic search
         """
+        logger.info("=" * 60)
+        logger.info(f"Starting semantic search for: '{user_query}'")
+        logger.info(f"Parameters: max_results={max_results}, top_n={top_n}, max_pdf_pages={max_pdf_pages}")
+        logger.info("=" * 60)
+
         try:
             # Step 1: Refine the query
             refined_query = self.refine_user_query(user_query, user_context)
@@ -536,6 +566,7 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
             papers = self.search_arxiv(refined_query, max_results)
 
             if len(papers) == 0:
+                logger.warning("No papers found on arXiv for this query")
                 return {
                     'error': 'No papers found',
                     'message': 'No papers found on arXiv for this query'
@@ -547,6 +578,7 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
             filtered_papers, excluded_papers = self.filter_papers_by_page_count(papers, max_pdf_pages)
 
             if len(filtered_papers) == 0:
+                logger.warning("All papers exceeded the page limit")
                 return {
                     'error': 'No papers after filtering',
                     'message': 'All papers exceed the page limit'
@@ -560,6 +592,8 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
             # Create array of top 5 PDF links
             top_5_links = [paper['pdf_link'] for paper in results['top_papers']]
 
+            logger.info(f"Search complete! Returning {len(results['top_papers'])} top papers")
+            logger.info("=" * 60)
             return {
                 'query': user_query,
                 'timestamp': datetime.now().isoformat(),
@@ -575,6 +609,7 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
             }
 
         except Exception as error:
+            logger.error(f"Search failed with exception: {error}", exc_info=True)
             return {
                 'error': 'Search failed',
                 'message': str(error)

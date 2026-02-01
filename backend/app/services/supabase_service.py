@@ -61,16 +61,18 @@ class SupabaseService:
         return response.user if response else None
 
     # Database methods
+    # NOTE: Using client (anon key) instead of admin (service key) as a test
+    # because the service key format appears to be rejected by the REST API
     def table(self, table_name: str):
         """Get a table reference for queries."""
-        return self.admin.table(table_name)
+        return self.client.table(table_name)
 
     async def insert(self, table_name: str, data: dict) -> Optional[dict]:
-        response = self.admin.table(table_name).insert(data).execute()
+        response = self.client.table(table_name).insert(data).execute()
         return response.data[0] if response.data else None
 
     async def select(self, table_name: str, columns: str = "*", filters: Optional[dict] = None) -> list:
-        query = self.admin.table(table_name).select(columns)
+        query = self.client.table(table_name).select(columns)
         if filters:
             for key, value in filters.items():
                 query = query.eq(key, value)
@@ -78,14 +80,14 @@ class SupabaseService:
         return response.data
 
     async def update(self, table_name: str, data: dict, filters: dict) -> Optional[dict]:
-        query = self.admin.table(table_name).update(data)
+        query = self.client.table(table_name).update(data)
         for key, value in filters.items():
             query = query.eq(key, value)
         response = query.execute()
         return response.data[0] if response.data else None
 
     async def delete(self, table_name: str, filters: dict) -> bool:
-        query = self.admin.table(table_name).delete()
+        query = self.client.table(table_name).delete()
         for key, value in filters.items():
             query = query.eq(key, value)
         response = query.execute()
