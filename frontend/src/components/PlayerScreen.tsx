@@ -20,6 +20,9 @@ interface AudioBuffer {
   isLoaded: boolean;
 }
 
+// Ref to hold the onSegmentEnd callback (avoids stale closure issues)
+let onSegmentEndCallback: ((segmentIndex: number) => void) | null = null;
+
 export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: PlayerScreenProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -39,11 +42,23 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   const nextAudioRef = useRef<AudioBuffer | null>(null);
   const segmentStartTimeRef = useRef(0);
   const preloadedSegmentsRef = useRef<Map<number, string>>(new Map());
+  
+  // Track actual audio durations (from loaded audio files)
+  const actualDurationsRef = useRef<Map<number, number>>(new Map());
+  const [durationsLoaded, setDurationsLoaded] = useState(0); // trigger re-render when durations update
 
-  // Calculate total duration from segments or use fallback
-  const totalDuration = podcast?.total_duration_seconds ||
-    podcast?.segments.reduce((sum, seg) => sum + (seg.duration_seconds || 60), 0) ||
-    240;
+  // Get actual duration for a segment (prefer actual, fallback to API, then 60s)
+  const getSegmentDuration = useCallback((segmentIndex: number): number => {
+    const actual = actualDurationsRef.current.get(segmentIndex);
+    if (actual && actual > 0) return actual;
+    return podcast?.segments?.[segmentIndex]?.duration_seconds || 60;
+  }, [podcast?.segments]);
+
+  // Calculate total duration using actual durations when available
+  const totalDuration = React.useMemo(() => {
+    if (!podcast?.segments?.length) return 240;
+    return podcast.segments.reduce((sum, _, idx) => sum + getSegmentDuration(idx), 0);
+  }, [podcast?.segments, getSegmentDuration, durationsLoaded]);
 
   // Load podcast data
   useEffect(() => {
@@ -75,15 +90,15 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   // Get current segment
   const currentSegment = podcast?.segments?.[currentSegmentIndex];
 
-  // Calculate cumulative time at segment start
+  // Calculate cumulative time at segment start (using actual durations)
   const getSegmentStartTime = useCallback((segmentIndex: number) => {
     if (!podcast?.segments) return 0;
     let time = 0;
     for (let i = 0; i < segmentIndex; i++) {
-      time += podcast.segments[i].duration_seconds || 60;
+      time += getSegmentDuration(i);
     }
     return time;
-  }, [podcast?.segments]);
+  }, [podcast?.segments, getSegmentDuration]);
 
   // Fetch and cache audio blob for a segment
   const fetchSegmentAudio = useCallback(async (segmentIndex: number): Promise<string | null> => {
@@ -120,11 +135,27 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     }
   }, [podcastId, token, podcast?.segments]);
 
-  // Create audio buffer for a segment
+  // Create audio buffer for a segment (captures actual duration on load)
   const createAudioBuffer = useCallback((segmentIndex: number, blobUrl: string): AudioBuffer => {
     const audio = new Audio();
     audio.src = blobUrl;
     audio.preload = 'auto';
+    
+    // Capture actual duration when metadata loads
+    audio.addEventListener('loadedmetadata', () => {
+      if (audio.duration && audio.duration > 0 && isFinite(audio.duration)) {
+        actualDurationsRef.current.set(segmentIndex, audio.duration);
+        setDurationsLoaded(prev => prev + 1); // Trigger re-render to update timeline
+      }
+    });
+    
+    // Attach ended listener immediately (uses callback ref to avoid stale closures)
+    audio.addEventListener('ended', () => {
+      if (onSegmentEndCallback) {
+        onSegmentEndCallback(segmentIndex);
+      }
+    });
+    
     return {
       audio,
       segmentIndex,
@@ -170,7 +201,61 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     };
   }, [podcast?.segments, podcastId, token, fetchSegmentAudio, createAudioBuffer]);
 
-  // Handle segment transitions with seamless playback
+  // Handle segment end callback (called from audio 'ended' event attached in createAudioBuffer)
+  const handleSegmentEnd = useCallback(async (endedSegmentIndex: number) => {
+    if (!podcast?.segments) return;
+    
+    // Only handle if this is the current segment that ended
+    if (endedSegmentIndex !== currentSegmentIndex) return;
+    
+    const nextIndex = currentSegmentIndex + 1;
+
+    if (nextIndex >= podcast.segments.length) {
+      // Podcast finished
+      setIsPlaying(false);
+      return;
+    }
+
+    // Seamlessly switch to preloaded next segment
+    if (nextAudioRef.current && nextAudioRef.current.segmentIndex === nextIndex) {
+      // Swap buffers
+      currentAudioRef.current = nextAudioRef.current;
+      nextAudioRef.current = null;
+      segmentStartTimeRef.current = getSegmentStartTime(nextIndex);
+      setCurrentSegmentIndex(nextIndex);
+
+      // Play immediately (listener already attached via createAudioBuffer)
+      currentAudioRef.current.audio.play().catch(console.error);
+
+      // Preload the following segment
+      const followingIndex = nextIndex + 1;
+      if (followingIndex < podcast.segments.length) {
+        const blobUrl = await fetchSegmentAudio(followingIndex);
+        if (blobUrl) {
+          nextAudioRef.current = createAudioBuffer(followingIndex, blobUrl);
+        }
+      }
+    } else {
+      // Fallback: next not preloaded, load it now
+      const blobUrl = await fetchSegmentAudio(nextIndex);
+      if (blobUrl) {
+        currentAudioRef.current = createAudioBuffer(nextIndex, blobUrl);
+        segmentStartTimeRef.current = getSegmentStartTime(nextIndex);
+        setCurrentSegmentIndex(nextIndex);
+        currentAudioRef.current.audio.play().catch(console.error);
+      }
+    }
+  }, [currentSegmentIndex, podcast?.segments, getSegmentStartTime, fetchSegmentAudio, createAudioBuffer]);
+
+  // Update the callback ref whenever handleSegmentEnd changes
+  useEffect(() => {
+    onSegmentEndCallback = handleSegmentEnd;
+    return () => {
+      onSegmentEndCallback = null;
+    };
+  }, [handleSegmentEnd]);
+
+  // Handle timeupdate for progress tracking
   useEffect(() => {
     const currentBuffer = currentAudioRef.current;
     if (!currentBuffer || !podcast?.segments) return;
@@ -183,70 +268,18 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
       setCurrentTime(Math.floor(absoluteTime));
     };
 
-    const handleEnded = async () => {
-      const nextIndex = currentSegmentIndex + 1;
-
-      if (nextIndex >= podcast.segments.length) {
-        // Podcast finished
-        setIsPlaying(false);
-        return;
-      }
-
-      // Seamlessly switch to preloaded next segment
-      if (nextAudioRef.current && nextAudioRef.current.segmentIndex === nextIndex) {
-        // Swap buffers - next becomes current
-        currentAudioRef.current = nextAudioRef.current;
-        nextAudioRef.current = null;
-
-        // Update segment start time
-        segmentStartTimeRef.current = getSegmentStartTime(nextIndex);
-
-        // Start playing immediately (no gap)
-        currentAudioRef.current.audio.play().catch(console.error);
-
-        // Update state
-        setCurrentSegmentIndex(nextIndex);
-
-        // Preload the following segment
-        const followingIndex = nextIndex + 1;
-        if (followingIndex < podcast.segments.length) {
-          const blobUrl = await fetchSegmentAudio(followingIndex);
-          if (blobUrl) {
-            nextAudioRef.current = createAudioBuffer(followingIndex, blobUrl);
-          }
-        }
-      } else {
-        // Fallback: next not preloaded, load it now (will have a small gap)
-        const blobUrl = await fetchSegmentAudio(nextIndex);
-        if (blobUrl) {
-          currentAudioRef.current = createAudioBuffer(nextIndex, blobUrl);
-          segmentStartTimeRef.current = getSegmentStartTime(nextIndex);
-          currentAudioRef.current.audio.play().catch(console.error);
-          setCurrentSegmentIndex(nextIndex);
-        }
-      }
-    };
-
     const handleError = (e: Event) => {
       console.error('Audio error:', e);
     };
 
-    const handleCanPlayThrough = () => {
-      // Audio is buffered enough for continuous playback
-    };
-
     audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
-    audio.addEventListener('canplaythrough', handleCanPlayThrough);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
-      audio.removeEventListener('canplaythrough', handleCanPlayThrough);
     };
-  }, [currentSegmentIndex, podcast?.segments, getSegmentStartTime, fetchSegmentAudio, createAudioBuffer]);
+  }, [currentSegmentIndex, podcast?.segments, isAudioReady]);
 
   // Play/pause audio
   useEffect(() => {
@@ -322,6 +355,8 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   const skipToSegment = async (targetIndex: number) => {
     if (!podcast?.segments || targetIndex < 0 || targetIndex >= podcast.segments.length) return;
 
+    const wasPlaying = isPlaying;
+    
     // Pause current audio
     if (currentAudioRef.current) {
       currentAudioRef.current.audio.pause();
@@ -343,8 +378,8 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     segmentStartTimeRef.current = getSegmentStartTime(targetIndex);
     setCurrentSegmentIndex(targetIndex);
 
-    // Start playing if was playing
-    if (isPlaying && currentAudioRef.current) {
+    // Start playing if was playing (listener already attached via createAudioBuffer)
+    if (wasPlaying && currentAudioRef.current) {
       currentAudioRef.current.audio.play().catch(console.error);
     }
 
@@ -368,7 +403,7 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     // Find which segment this time falls into
     let cumulativeTime = 0;
     for (let i = 0; i < podcast.segments.length; i++) {
-      const segmentDuration = podcast.segments[i].duration_seconds || 60;
+      const segmentDuration = getSegmentDuration(i);
       if (cumulativeTime + segmentDuration > targetTime) {
         const positionInSegment = targetTime - cumulativeTime;
 
@@ -461,11 +496,6 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
               <div className="text-white text-center p-8">
                 <div className="text-5xl font-bold mb-3">PodAsk</div>
                 <div className="text-lg opacity-90">{displayTopic}</div>
-                {segmentCount > 0 && (
-                  <div className="text-sm opacity-70 mt-2">
-                    Segment {currentSegmentIndex + 1} of {segmentCount}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -512,7 +542,12 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
             </div>
             <div className="flex justify-between text-xs text-gray-400">
               <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(totalDuration)}</span>
+              {segmentCount > 0 && (
+                <span className="text-gray-300 font-medium">
+                  Segment {currentSegmentIndex + 1} of {segmentCount}
+                </span>
+              )}
+              <span>{formatTime(Math.round(totalDuration))}</span>
             </div>
           </div>
 

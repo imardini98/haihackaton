@@ -192,6 +192,14 @@ export default function App() {
     setPodcastId(null);
   };
 
+  // Test mode: skip directly to an existing podcast
+  const handleTestPodcast = () => {
+    const testPodcastId = '89ab627c-4dc5-4bc8-988e-347582cdeaa4';
+    setTopic('Test Podcast');
+    setPodcastId(testPodcastId);
+    setAppState('player');
+  };
+
   const handleLogin = (session: AuthResponse) => {
     try {
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
@@ -256,7 +264,10 @@ export default function App() {
       ) : (
         <>
           {appState === 'landing' && (
-            <LandingScreen onGeneratePodcast={handleGeneratePodcast} />
+            <LandingScreen 
+              onGeneratePodcast={handleGeneratePodcast} 
+              onTestPodcast={handleTestPodcast}
+            />
           )}
           {appState === 'research' && (
             <ResearchProgressScreen
