@@ -4,23 +4,111 @@ import { ResearchProgressScreen } from './components/ResearchProgressScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { PlayerScreen } from './components/PlayerScreen';
 import { LoginScreen } from './components/LoginScreen';
+import { SignupScreen } from './components/SignupScreen';
+import { ForgotPasswordScreen } from './components/ForgotPasswordScreen';
+import { ResetPasswordScreen } from './components/ResetPasswordScreen';
+import { getMe, type AuthResponse } from './api/auth';
 
 type AppState = 'landing' | 'research' | 'loading' | 'player';
 type AuthState = 'unknown' | 'authenticated' | 'unauthenticated';
 
-const AUTH_STORAGE_KEY = 'podask.authenticated';
+const LEGACY_AUTH_STORAGE_KEY = 'podask.authenticated';
+const SESSION_STORAGE_KEY = 'podask.session';
+
+function getRecoveryAccessTokenFromUrl(): string | null {
+  try {
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+    const hashParams = new URLSearchParams(hash);
+    const queryParams = new URLSearchParams(window.location.search);
+    return (
+      hashParams.get('access_token') ||
+      queryParams.get('access_token') ||
+      queryParams.get('token')
+    );
+  } catch {
+    return null;
+  }
+}
+
+function stripRecoveryParamsFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.hash = '';
+    url.searchParams.delete('access_token');
+    url.searchParams.delete('refresh_token');
+    url.searchParams.delete('token');
+    url.searchParams.delete('type');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  } catch {
+    // ignore
+  }
+}
+
+function getStoredSession(): AuthResponse | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthResponse> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.access_token !== 'string' || !parsed.access_token.trim()) return null;
+    if (typeof parsed.user_id !== 'string' || typeof parsed.email !== 'string') return null;
+    return parsed as AuthResponse;
+  } catch {
+    return null;
+  }
+}
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('landing');
   const [topic, setTopic] = useState('');
   const [authState, setAuthState] = useState<AuthState>('unknown');
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'forgotPassword' | 'resetPassword'>('login');
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      setAuthState(stored === 'true' ? 'authenticated' : 'unauthenticated');
-    } catch {
-      setAuthState('unauthenticated');
+    let cancelled = false;
+
+    const clearStoredSession = () => {
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+        localStorage.removeItem('podask.email');
+      } catch {
+        // ignore
+      }
+    };
+
+    const bootstrapAuth = async () => {
+      const session = getStoredSession();
+
+      if (!session) {
+        clearStoredSession();
+        if (!cancelled) setAuthState('unauthenticated');
+        return;
+      }
+
+      try {
+        await getMe(session.access_token);
+        if (!cancelled) setAuthState('authenticated');
+      } catch {
+        clearStoredSession();
+        if (!cancelled) setAuthState('unauthenticated');
+      }
+    };
+
+    bootstrapAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const token = getRecoveryAccessTokenFromUrl();
+    if (token) {
+      setRecoveryToken(token);
+      setAuthView('resetPassword');
+      stripRecoveryParamsFromUrl();
     }
   }, []);
 
@@ -38,11 +126,9 @@ export default function App() {
     setTopic('');
   };
 
-  const handleLogin = ({ email }: { email: string }) => {
-    // Frontend-only: persist a boolean, ignore credentials for now.
+  const handleLogin = (session: AuthResponse) => {
     try {
-      localStorage.setItem(AUTH_STORAGE_KEY, 'true');
-      localStorage.setItem('podask.email', email);
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
     } catch {
       // ignore
     }
@@ -51,12 +137,15 @@ export default function App() {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
       localStorage.removeItem('podask.email');
     } catch {
       // ignore
     }
     setAuthState('unauthenticated');
+    setAuthView('login');
+    setRecoveryToken(null);
     handleBackToLanding();
   };
 
@@ -72,8 +161,30 @@ export default function App() {
         </button>
       )}
 
-      {authState !== 'authenticated' ? (
-        <LoginScreen onLogin={handleLogin} />
+      {authState === 'unknown' ? (
+        <div className="min-h-screen flex items-center justify-center px-6 py-12 md:py-16">
+          <div className="text-white/80 text-sm">Checking session…</div>
+        </div>
+      ) : authState !== 'authenticated' ? (
+        authView === 'signup' ? (
+          <SignupScreen onSignup={handleLogin} onBackToLogin={() => setAuthView('login')} />
+        ) : authView === 'forgotPassword' ? (
+          <ForgotPasswordScreen onBackToLogin={() => setAuthView('login')} />
+        ) : authView === 'resetPassword' ? (
+          <ResetPasswordScreen
+            accessToken={recoveryToken || ''}
+            onBackToLogin={() => {
+              setRecoveryToken(null);
+              setAuthView('login');
+            }}
+          />
+        ) : (
+          <LoginScreen
+            onLogin={handleLogin}
+            onCreateAccount={() => setAuthView('signup')}
+            onForgotPassword={() => setAuthView('forgotPassword')}
+          />
+        )
       ) : (
         <>
           {appState === 'landing' && (
