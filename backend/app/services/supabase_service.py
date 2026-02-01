@@ -28,10 +28,22 @@ class SupabaseService:
         return self._admin
 
     # Auth methods
-    async def sign_up(self, email: str, password: str) -> dict:
+    async def sign_up(
+        self,
+        email: str,
+        password: str,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None
+    ) -> dict:
         response = self.client.auth.sign_up({
             "email": email,
-            "password": password
+            "password": password,
+            "options": {
+                "data": {
+                    "first_name": first_name,
+                    "last_name": last_name
+                }
+            }
         })
         return response
 

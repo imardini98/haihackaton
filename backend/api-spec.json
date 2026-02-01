@@ -1199,6 +1199,20 @@
                     "email": {
                         "type": "string",
                         "title": "Email"
+                    },
+                    "first_name": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "title": "First Name"
+                    },
+                    "last_name": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "title": "Last Name"
                     }
                 },
                 "type": "object",
@@ -1956,12 +1970,22 @@
                     "password": {
                         "type": "string",
                         "title": "Password"
+                    },
+                    "first_name": {
+                        "type": "string",
+                        "title": "First Name"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "title": "Last Name"
                     }
                 },
                 "type": "object",
                 "required": [
                     "email",
-                    "password"
+                    "password",
+                    "first_name",
+                    "last_name"
                 ],
                 "title": "SignUpRequest"
             },
@@ -1974,6 +1998,20 @@
                     "email": {
                         "type": "string",
                         "title": "Email"
+                    },
+                    "first_name": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "title": "First Name"
+                    },
+                    "last_name": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "title": "Last Name"
                     }
                 },
                 "type": "object",
