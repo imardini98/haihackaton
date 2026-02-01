@@ -58,7 +58,7 @@ export function ForgotPasswordScreen({ onBackToLogin }: ForgotPasswordScreenProp
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12 md:py-16">
+    <div className="min-h-screen flex items-center justify-center px-6 py-12 md:px-12 md:py-20 lg:px-24">
       <div className="w-full max-w-[420px] mx-auto">
         {/* Logo */}
         <div className="flex justify-center mb-8 md:mb-10">

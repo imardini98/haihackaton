@@ -2,8 +2,9 @@ from __future__ import annotations
 import os
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from elevenlabs import ElevenLabs
+from pydub import AudioSegment
 from app.config import get_settings
 
 
@@ -58,14 +59,20 @@ class ElevenLabsService:
         dialogue: list[dict],
         segment_id: str
     ) -> str:
-        """Generate audio for a full segment dialogue."""
+        """Generate audio for a full segment dialogue with both host and expert voices."""
         settings = get_settings()
 
-        # Generate audio for each line and combine
-        audio_files = []
+        # Debug: log dialogue structure
+        print(f"[TTS] Generating audio for segment {segment_id}")
+        print(f"[TTS] Dialogue has {len(dialogue)} lines")
+        for i, line in enumerate(dialogue):
+            print(f"[TTS] Line {i}: speaker={line.get('speaker', 'MISSING')}, text={line.get('text', '')[:50]}...")
+
+        # Generate audio for each line
+        audio_files: List[str] = []
 
         for i, line in enumerate(dialogue):
-            speaker = line.get("speaker", "host")
+            speaker = line.get("speaker", "host").lower().strip()
             text = line.get("text", "")
 
             if not text:
@@ -81,11 +88,38 @@ class ElevenLabsService:
             audio_path = await self.text_to_speech(text, voice_id, filename)
             audio_files.append(audio_path)
 
-        # For MVP, return the first audio file path
-        # TODO: Combine audio files into single segment audio
-        if audio_files:
+        if not audio_files:
+            return ""
+
+        # If only one file, return it directly
+        if len(audio_files) == 1:
             return audio_files[0]
-        return ""
+
+        # Combine all audio files into a single segment
+        combined = AudioSegment.empty()
+
+        # Small pause between speakers (300ms)
+        pause = AudioSegment.silent(duration=300)
+
+        for i, audio_path in enumerate(audio_files):
+            segment = AudioSegment.from_mp3(audio_path)
+            if i > 0:
+                combined += pause
+            combined += segment
+
+        # Export combined audio
+        combined_filename = f"{segment_id}_combined.mp3"
+        combined_path = self._get_audio_path(combined_filename)
+        combined.export(str(combined_path), format="mp3")
+
+        # Clean up individual line files
+        for audio_path in audio_files:
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+
+        return str(combined_path)
 
     async def generate_host_audio(self, text: str, filename: Optional[str] = None) -> str:
         """Generate audio with HOST voice."""

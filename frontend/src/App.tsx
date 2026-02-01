@@ -15,16 +15,44 @@ type AuthState = 'unknown' | 'authenticated' | 'unauthenticated';
 const LEGACY_AUTH_STORAGE_KEY = 'podask.authenticated';
 const SESSION_STORAGE_KEY = 'podask.session';
 
-function getRecoveryAccessTokenFromUrl(): string | null {
+type UrlAuthResult =
+  | { type: 'recovery'; accessToken: string }
+  | { type: 'signup'; accessToken: string; refreshToken?: string }
+  | { type: 'error'; code: string; description: string }
+  | null;
+
+function parseAuthFromUrl(): UrlAuthResult {
   try {
     const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
     const hashParams = new URLSearchParams(hash);
     const queryParams = new URLSearchParams(window.location.search);
-    return (
-      hashParams.get('access_token') ||
-      queryParams.get('access_token') ||
-      queryParams.get('token')
-    );
+
+    // Check for errors first (e.g., expired email link)
+    const error = hashParams.get('error') || queryParams.get('error');
+    if (error) {
+      return {
+        type: 'error',
+        code: hashParams.get('error_code') || queryParams.get('error_code') || error,
+        description: hashParams.get('error_description') || queryParams.get('error_description') || 'Authentication failed',
+      };
+    }
+
+    const accessToken = hashParams.get('access_token') || queryParams.get('access_token') || queryParams.get('token');
+    if (!accessToken) return null;
+
+    const authType = hashParams.get('type') || queryParams.get('type');
+
+    // Email verification callback (type=signup)
+    if (authType === 'signup') {
+      return {
+        type: 'signup',
+        accessToken,
+        refreshToken: hashParams.get('refresh_token') || queryParams.get('refresh_token') || undefined,
+      };
+    }
+
+    // Password recovery callback (type=recovery or no type)
+    return { type: 'recovery', accessToken };
   } catch {
     return null;
   }
@@ -38,6 +66,29 @@ function stripRecoveryParamsFromUrl() {
     url.searchParams.delete('refresh_token');
     url.searchParams.delete('token');
     url.searchParams.delete('type');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  } catch {
+    // ignore
+  }
+}
+
+function getPodcastIdFromUrl(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('podcast_id');
+  } catch {
+    return null;
+  }
+}
+
+function updatePodcastIdInUrl(podcastId: string | null) {
+  try {
+    const url = new URL(window.location.href);
+    if (podcastId) {
+      url.searchParams.set('podcast_id', podcastId);
+    } else {
+      url.searchParams.delete('podcast_id');
+    }
     window.history.replaceState({}, '', `${url.pathname}${url.search}`);
   } catch {
     // ignore
@@ -59,11 +110,16 @@ function getStoredSession(): AuthResponse | null {
 }
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('landing');
-  const [topic, setTopic] = useState('');
+  // Check URL for podcast_id on initial load
+  const initialPodcastId = getPodcastIdFromUrl();
+
+  const [appState, setAppState] = useState<AppState>(initialPodcastId ? 'player' : 'landing');
+  const [topic, setTopic] = useState(initialPodcastId ? 'Saved Podcast' : '');
+  const [podcastId, setPodcastId] = useState<string | null>(initialPodcastId);
   const [authState, setAuthState] = useState<AuthState>('unknown');
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgotPassword' | 'resetPassword'>('login');
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,11 +160,45 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const token = getRecoveryAccessTokenFromUrl();
-    if (token) {
-      setRecoveryToken(token);
+    const authResult = parseAuthFromUrl();
+    if (!authResult) return;
+
+    stripRecoveryParamsFromUrl();
+
+    if (authResult.type === 'error') {
+      // Email verification or other auth error
+      const message = authResult.description.replace(/\+/g, ' ');
+      setAuthError(message);
+      setAuthView('login');
+      return;
+    }
+
+    if (authResult.type === 'signup') {
+      // Email verification successful - auto-login
+      (async () => {
+        try {
+          const userInfo = await getMe(authResult.accessToken);
+          const session: AuthResponse = {
+            access_token: authResult.accessToken,
+            user_id: userInfo.id,
+            email: userInfo.email,
+            first_name: userInfo.first_name,
+            last_name: userInfo.last_name,
+          };
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+          setAuthState('authenticated');
+        } catch {
+          setAuthError('Email verified but failed to retrieve user info. Please sign in.');
+          setAuthView('login');
+        }
+      })();
+      return;
+    }
+
+    if (authResult.type === 'recovery') {
+      // Password reset flow
+      setRecoveryToken(authResult.accessToken);
       setAuthView('resetPassword');
-      stripRecoveryParamsFromUrl();
     }
   }, []);
 
@@ -117,13 +207,26 @@ export default function App() {
     setAppState('research');
   };
 
-  const handleResearchComplete = () => {
+  const handleResearchComplete = (generatedPodcastId: string) => {
+    setPodcastId(generatedPodcastId);
+    updatePodcastIdInUrl(generatedPodcastId);
     setAppState('player');
   };
-  
+
   const handleBackToLanding = () => {
     setAppState('landing');
     setTopic('');
+    setPodcastId(null);
+    updatePodcastIdInUrl(null);
+  };
+
+  // Test mode: skip directly to an existing podcast
+  const handleTestPodcast = () => {
+    const testPodcastId = '89ab627c-4dc5-4bc8-988e-347582cdeaa4';
+    setTopic('Test Podcast');
+    setPodcastId(testPodcastId);
+    updatePodcastIdInUrl(testPodcastId);
+    setAppState('player');
   };
 
   const handleLogin = (session: AuthResponse) => {
@@ -183,21 +286,35 @@ export default function App() {
             onLogin={handleLogin}
             onCreateAccount={() => setAuthView('signup')}
             onForgotPassword={() => setAuthView('forgotPassword')}
+            initialError={authError}
+            onClearError={() => setAuthError(null)}
           />
         )
       ) : (
         <>
           {appState === 'landing' && (
-            <LandingScreen onGeneratePodcast={handleGeneratePodcast} />
+            <LandingScreen 
+              onGeneratePodcast={handleGeneratePodcast} 
+              onTestPodcast={handleTestPodcast}
+            />
           )}
           {appState === 'research' && (
-            <ResearchProgressScreen topic={topic} onComplete={handleResearchComplete} />
+            <ResearchProgressScreen
+              topic={topic}
+              token={getStoredSession()?.access_token || ''}
+              onComplete={handleResearchComplete}
+            />
           )}
           {appState === 'loading' && (
             <LoadingScreen />
           )}
           {appState === 'player' && (
-            <PlayerScreen topic={topic} onBackToLanding={handleBackToLanding} />
+            <PlayerScreen
+              topic={topic}
+              podcastId={podcastId}
+              token={getStoredSession()?.access_token || ''}
+              onBackToLanding={handleBackToLanding}
+            />
           )}
         </>
       )}

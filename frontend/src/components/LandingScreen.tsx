@@ -3,9 +3,10 @@ import logo from '../assets/433dc299e6c56f79156becafd6df63c758f567fc.png';
 
 interface LandingScreenProps {
   onGeneratePodcast: (topic: string) => void;
+  onTestPodcast?: () => void; // For testing existing podcast
 }
 
-export function LandingScreen({ onGeneratePodcast }: LandingScreenProps) {
+export function LandingScreen({ onGeneratePodcast, onTestPodcast }: LandingScreenProps) {
   const [inputValue, setInputValue] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -74,6 +75,17 @@ export function LandingScreen({ onGeneratePodcast }: LandingScreenProps) {
           >
             Generate Podcast
           </button>
+
+          {/* Test button for existing podcast */}
+          {onTestPodcast && (
+            <button
+              type="button"
+              onClick={onTestPodcast}
+              className="w-full py-3 px-6 rounded-xl text-sm font-medium transition-colors text-blue-300 hover:text-white border border-blue-500/30 hover:border-blue-400/50 hover:bg-blue-500/10"
+            >
+              🎧 Test Existing Podcast
+            </button>
+          )}
         </form>
       </div>
     </div>

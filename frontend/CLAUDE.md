@@ -9,154 +9,270 @@ React + Vite + TypeScript frontend for PodAsk AI - transforming scientific paper
 
 ---
 
-## Current State
+## Current State (Feb 2026)
 
-### Existing Components
-- `LoginScreen.tsx` - Login/signup (currently mocked with localStorage)
-- `LandingScreen.tsx` - Topic input to start podcast generation
-- `ResearchProgressScreen.tsx` - Shows paper search/ingestion progress
-- `PlayerScreen.tsx` - Podcast player with segments
-- `QuestionModal.tsx` - Q&A interface
-- `AnswerModal.tsx` - Display answers
-- `HandRaiseAnimation.tsx` - "Raise hand" button animation
-- `LoadingScreen.tsx` - Loading states
+### What's DONE ✅
 
-### App Flow (Current - Mocked)
+#### Phase 1: API Client Setup ✅ COMPLETE
+- [x] `src/api/http.ts` - Fetch wrapper with base URL, error handling, token support
+- [x] `src/api/auth.ts` - Auth API functions (signIn, signUp, getMe, passwordReset, updatePassword)
+- [x] Environment variables via `VITE_API_BASE_URL`
+- [x] Token management in localStorage (`podask.session`)
+
+#### Phase 2: Authentication Integration ✅ COMPLETE
+- [x] `LoginScreen.tsx` - Calls `POST /auth/signin`
+- [x] `SignupScreen.tsx` - Calls `POST /auth/signup` with first_name/last_name
+- [x] Email verification flow (shows "Check your email" when access_token is empty)
+- [x] URL callback handling (type=signup vs type=recovery)
+- [x] JWT token stored in localStorage
+- [x] Token added to authenticated requests via `requestJson()`
+- [x] Session validation on app load via `getMe()`
+- [x] Logout functionality (clears storage)
+- [x] `ForgotPasswordScreen.tsx` - Calls `POST /auth/password-reset`
+- [x] `ResetPasswordScreen.tsx` - Calls `POST /auth/password-update`
+
+#### UI Components ✅ COMPLETE (but some are mocked)
+- [x] `LandingScreen.tsx` - Topic input form (FUNCTIONAL)
+- [x] `ResearchProgressScreen.tsx` - 7-step animation UI (MOCKED - no API calls)
+- [x] `PlayerScreen.tsx` - Podcast player UI (MOCKED - fake timer, no audio)
+- [x] `QuestionModal.tsx` - Voice/text question UI (MOCKED - no recording)
+- [x] `AnswerModal.tsx` - Answer playback UI (MOCKED - no audio)
+- [x] `HandRaiseAnimation.tsx` - Full-screen animation (FUNCTIONAL)
+- [x] Full shadcn/ui component library available in `src/components/ui/`
+
+---
+
+### What's REMAINING 🔴
+
+#### Phase 3: Paper Search & Ingestion 🔴 NOT STARTED
+- [ ] Create `src/api/papers.ts`:
+  - [ ] `searchPapers(query, maxResults)` → `POST /papers/search`
+  - [ ] `ingestPaper(arxivId)` → `POST /papers/ingest`
+  - [ ] `listPapers()` → `GET /papers`
+  - [ ] `getPaper(id)` → `GET /papers/{id}`
+  - [ ] `deletePaper(id)` → `DELETE /papers/{id}`
+- [ ] Update `ResearchProgressScreen.tsx`:
+  - [ ] Call search API with user's topic
+  - [ ] Display/select papers found
+  - [ ] Ingest selected papers
+  - [ ] Show real progress (not fake timer)
+  - [ ] Store paper IDs for podcast generation
+
+#### Phase 4: Podcast Generation 🔴 NOT STARTED
+- [ ] Create `src/api/podcasts.ts`:
+  - [ ] `generatePodcast(paperIds, topic)` → `POST /podcasts/generate`
+  - [ ] `getPodcastStatus(id)` → `GET /podcasts/{id}/status`
+  - [ ] `getPodcast(id)` → `GET /podcasts/{id}`
+  - [ ] `listPodcasts()` → `GET /podcasts`
+  - [ ] `deletePodcast(id)` → `DELETE /podcasts/{id}`
+- [ ] After papers ingested:
+  - [ ] Call generate API with paper IDs
+  - [ ] Poll status until "ready" or "failed"
+  - [ ] Show generation progress
+  - [ ] Navigate to player when ready
+
+#### Phase 5: Podcast Player Integration 🔴 NOT STARTED
+- [ ] Update `PlayerScreen.tsx`:
+  - [ ] Accept `podcastId` prop
+  - [ ] Fetch podcast with segments via API
+  - [ ] Create HTML5 Audio element
+  - [ ] Build audio URL: `/podcasts/{id}/audio/{sequence}`
+  - [ ] Track current segment
+  - [ ] Play/pause, skip, seek controls
+  - [ ] Auto-advance on segment end
+  - [ ] Display segment info and progress
+
+#### Phase 6: "Raise Your Hand" Q&A 🔴 NOT STARTED
+- [ ] Create `src/api/interaction.ts`:
+  - [ ] `startSession(podcastId, segmentId)` → `POST /interaction/session/start`
+  - [ ] `askText(sessionId, question)` → `POST /interaction/ask-text`
+  - [ ] `askVoice(sessionId, audioBlob)` → `POST /interaction/ask`
+  - [ ] `continueSession(sessionId)` → `POST /interaction/continue`
+- [ ] Session management:
+  - [ ] Start session when player loads
+  - [ ] Update position on segment change
+- [ ] Q&A flow:
+  - [ ] On hand raise: wait for segment end
+  - [ ] Open QuestionModal
+  - [ ] Text question: send to API, play response audio
+  - [ ] Voice question: record audio, send to API, play response
+  - [ ] Continue: call API, play resume audio, next segment
+
+#### Phase 7: Polish & UX
+- [ ] Error handling with toast notifications (Sonner installed)
+- [ ] Loading states for all API calls
+- [ ] Podcast list view (show previous podcasts)
+- [ ] Audio buffering/preloading
+- [ ] Mobile responsiveness improvements
+
+---
+
+## Implementation Priority
+
+### HIGH PRIORITY - Core Podcast Flow
+Must complete for MVP:
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Create `src/api/papers.ts` | 🔴 |
+| 2 | Create `src/api/podcasts.ts` | 🔴 |
+| 3 | Integrate ResearchProgressScreen with APIs | 🔴 |
+| 4 | Implement status polling for generation | 🔴 |
+| 5 | Integrate PlayerScreen with real audio | 🔴 |
+
+### MEDIUM PRIORITY - Q&A Feature
+Interactive functionality:
+
+| # | Task | Status |
+|---|------|--------|
+| 6 | Create `src/api/interaction.ts` | 🔴 |
+| 7 | Implement text Q&A flow | 🔴 |
+| 8 | Implement voice recording (Web Audio API) | 🔴 |
+| 9 | Implement voice Q&A flow | 🔴 |
+
+### LOW PRIORITY - Polish
+After core features:
+
+| # | Task | Status |
+|---|------|--------|
+| 10 | Error toasts | 🔴 |
+| 11 | Podcast history list | 🔴 |
+| 12 | OAuth sign-in buttons | 🔴 |
+
+---
+
+## App Flow
+
+### Current Flow (Mocked)
 ```
-Login → Landing → Research Progress → Player
-         ↑                              ↓
-         └──────── Back to Landing ─────┘
+Login → Landing → Research Progress (fake) → Player (fake)
+         ↑                                      ↓
+         └──────────── Back to Landing ─────────┘
+```
+
+### Target Flow (Integrated)
+```
+Login → Landing → Search Papers → Ingest Papers → Generate Podcast → Poll Status → Player
+         ↑                                                                           ↓
+         │                                                            [Hand Raise] → Q&A
+         │                                                                           ↓
+         └───────────────────────────── Back to Landing ─────────────────────────────┘
 ```
 
 ---
 
-## Integration Roadmap
+## File Structure
 
-### Phase 1: API Client Setup
-- [ ] Create `/src/lib/api.ts` - Axios/fetch wrapper with base URL
-- [ ] Create `/src/lib/auth.ts` - Token management (localStorage)
-- [ ] Create `/src/hooks/useAuth.ts` - Auth state hook
-- [ ] Create `/src/contexts/AuthContext.tsx` - Auth context provider
-- [ ] Environment variables for API URL (`.env`)
-
-### Phase 2: Authentication Integration
-- [ ] Update `LoginScreen.tsx` to call `POST /auth/signin`
-- [ ] Add signup flow with `POST /auth/signup`
-- [ ] Store JWT token in localStorage
-- [ ] Add token to all authenticated requests
-- [ ] Handle 401 errors (redirect to login)
-- [ ] Implement logout (clear token)
-
-### Phase 3: Paper Search & Ingestion
-- [ ] Update `ResearchProgressScreen.tsx`:
-  - [ ] Call `POST /papers/search` with topic
-  - [ ] Display search results (papers found)
-  - [ ] Call `POST /papers/ingest` for selected papers
-  - [ ] Show ingestion progress
-  - [ ] Store paper IDs for podcast generation
-
-### Phase 4: Podcast Generation
-- [ ] After papers ingested, call `POST /podcasts/generate`
-- [ ] Poll `GET /podcasts/{id}/status` until "ready"
-- [ ] Show generation progress (pending → generating → ready)
-- [ ] Handle generation errors
-- [ ] Navigate to player when ready
-
-### Phase 5: Podcast Player Integration
-- [ ] Update `PlayerScreen.tsx`:
-  - [ ] Fetch podcast with `GET /podcasts/{id}`
-  - [ ] Load segments and audio URLs
-  - [ ] Play segment audio from `GET /podcasts/{id}/audio/{sequence}`
-  - [ ] Track current segment
-  - [ ] Auto-advance to next segment
-
-### Phase 6: "Raise Your Hand" Q&A
-- [ ] Start session with `POST /interaction/session/start`
-- [ ] On hand raise:
-  - [ ] Wait for current segment to finish
-  - [ ] Play `transition_to_question` audio
-  - [ ] Open QuestionModal
-- [ ] Voice question:
-  - [ ] Record audio (Web Audio API)
-  - [ ] Send to `POST /interaction/ask`
-  - [ ] Play response audio (host + expert)
-- [ ] Text question (fallback):
-  - [ ] Send to `POST /interaction/ask-text`
-  - [ ] Play response audio
-- [ ] Continue signal:
-  - [ ] Call `POST /interaction/continue`
-  - [ ] Play resume audio
-  - [ ] Continue to next segment
-
-### Phase 7: Polish & UX
-- [ ] Error handling with toast notifications
-- [ ] Loading states for all API calls
-- [ ] Offline detection
-- [ ] Audio buffering/preloading
-- [ ] Keyboard shortcuts for player
-- [ ] Mobile responsiveness
+```
+src/
+├── api/
+│   ├── http.ts              ✅ HTTP client with error handling
+│   ├── auth.ts              ✅ Auth functions (signIn, signUp, etc.)
+│   ├── papers.ts            🔴 TODO: Paper search/ingest
+│   ├── podcasts.ts          🔴 TODO: Podcast generation/playback
+│   └── interaction.ts       🔴 TODO: Q&A session
+├── components/
+│   ├── LoginScreen.tsx      ✅ Functional
+│   ├── SignupScreen.tsx     ✅ Functional
+│   ├── ForgotPasswordScreen.tsx  ✅ Functional
+│   ├── ResetPasswordScreen.tsx   ✅ Functional
+│   ├── LandingScreen.tsx    ✅ Functional
+│   ├── ResearchProgressScreen.tsx  ⚠️ UI only, needs API
+│   ├── PlayerScreen.tsx     ⚠️ UI only, needs API + audio
+│   ├── QuestionModal.tsx    ⚠️ UI only, needs API + recording
+│   ├── AnswerModal.tsx      ⚠️ UI only, needs audio
+│   ├── HandRaiseAnimation.tsx    ✅ Functional
+│   ├── LoadingScreen.tsx    ✅ Functional
+│   └── ui/                  ✅ shadcn/ui components
+├── App.tsx                  ✅ Root with auth state
+└── main.tsx                 ✅ Entry point
+```
 
 ---
 
 ## API Endpoints Summary
 
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/auth/signup` | Register user |
-| POST | `/auth/signin` | Login user |
-| GET | `/auth/me` | Get current user |
-| POST | `/auth/password-reset` | Request password reset |
+### Auth ✅ INTEGRATED
+| Method | Endpoint | Status |
+|--------|----------|--------|
+| POST | `/auth/signup` | ✅ |
+| POST | `/auth/signin` | ✅ |
+| GET | `/auth/me` | ✅ |
+| POST | `/auth/password-reset` | ✅ |
+| POST | `/auth/password-update` | ✅ |
 
-### Papers
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/papers/search` | No | Search ArXiv |
-| POST | `/papers/ingest` | Yes | Ingest paper |
-| GET | `/papers` | Yes | List user's papers |
-| GET | `/papers/{id}` | Yes | Get paper |
-| DELETE | `/papers/{id}` | Yes | Delete paper |
+### Papers 🔴 NOT INTEGRATED
+| Method | Endpoint | Auth | Status |
+|--------|----------|------|--------|
+| POST | `/papers/search` | No | 🔴 |
+| POST | `/papers/ingest` | Yes | 🔴 |
+| GET | `/papers` | Yes | 🔴 |
+| GET | `/papers/{id}` | Yes | 🔴 |
+| DELETE | `/papers/{id}` | Yes | 🔴 |
 
-### Podcasts
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/podcasts/generate` | Start generation |
-| GET | `/podcasts/{id}/status` | Poll status |
-| GET | `/podcasts` | List podcasts |
-| GET | `/podcasts/{id}` | Get with segments |
-| GET | `/podcasts/{id}/audio/{seq}` | Stream audio |
-| DELETE | `/podcasts/{id}` | Delete podcast |
+### Podcasts 🔴 NOT INTEGRATED
+| Method | Endpoint | Status |
+|--------|----------|--------|
+| POST | `/podcasts/generate` | 🔴 |
+| GET | `/podcasts/{id}/status` | 🔴 |
+| GET | `/podcasts` | 🔴 |
+| GET | `/podcasts/{id}` | 🔴 |
+| GET | `/podcasts/{id}/audio/{seq}` | 🔴 |
+| DELETE | `/podcasts/{id}` | 🔴 |
 
-### Interaction
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/interaction/session/start` | Start session |
-| POST | `/interaction/session/{id}/update` | Update position |
-| POST | `/interaction/ask` | Voice question |
-| POST | `/interaction/ask-text` | Text question |
-| POST | `/interaction/continue` | Continue signal |
+### Interaction 🔴 NOT INTEGRATED
+| Method | Endpoint | Status |
+|--------|----------|--------|
+| POST | `/interaction/session/start` | 🔴 |
+| POST | `/interaction/session/{id}/update` | 🔴 |
+| POST | `/interaction/ask` | 🔴 |
+| POST | `/interaction/ask-text` | 🔴 |
+| POST | `/interaction/continue` | 🔴 |
 
 ---
 
-## File Structure (Proposed)
+## API Types
 
-```
-src/
-├── components/          # UI components (existing)
-├── contexts/
-│   └── AuthContext.tsx  # Auth state provider
-├── hooks/
-│   ├── useAuth.ts       # Auth hook
-│   ├── usePodcast.ts    # Podcast player hook
-│   └── useRecorder.ts   # Audio recording hook
-├── lib/
-│   ├── api.ts           # API client
-│   ├── auth.ts          # Token management
-│   └── audio.ts         # Audio utilities
-├── types/
-│   └── api.ts           # TypeScript types for API
-├── App.tsx
-└── main.tsx
+```typescript
+// Papers
+interface Paper {
+  arxiv_id: string;
+  title: string;
+  authors: string[];
+  abstract: string;
+  published_date?: string;
+  pdf_url?: string;
+}
+
+interface IngestedPaper extends Paper {
+  id: string;
+  content?: string;
+}
+
+// Podcasts
+interface Podcast {
+  id: string;
+  title: string;
+  status: 'pending' | 'generating' | 'ready' | 'failed';
+  total_duration_seconds?: number;
+  segments: Segment[];
+}
+
+interface Segment {
+  id: string;
+  sequence: number;
+  topic_label?: string;
+  audio_url?: string;
+  duration_seconds?: number;
+}
+
+// Interaction
+interface QAExchange {
+  exchange_id: string;
+  host_acknowledgment: string;
+  expert_answer: string;
+  answer_audio_url?: string;
+}
 ```
 
 ---
@@ -164,43 +280,41 @@ src/
 ## Environment Variables
 
 ```env
-VITE_API_URL=https://amusing-luck-production-4d58.up.railway.app/api/v1
-```
+# Production
+VITE_API_BASE_URL=https://amusing-luck-production-4d58.up.railway.app/api/v1
 
-For local development:
-```env
-VITE_API_URL=http://localhost:8000/api/v1
+# Local development
+VITE_API_BASE_URL=http://localhost:8000/api/v1
 ```
 
 ---
 
-## Key Integration Points
+## Key Implementation Patterns
 
-### 1. Token Management
+### 1. Authenticated Requests
 ```typescript
-// Store token after login
-localStorage.setItem('podask.token', response.access_token);
+import { requestJson } from './http';
 
-// Add to requests
-headers: {
-  'Authorization': `Bearer ${token}`
-}
+// Token passed automatically from localStorage
+const session = JSON.parse(localStorage.getItem('podask.session'));
+const data = await requestJson('/papers', { token: session.access_token });
 ```
 
 ### 2. Polling Pattern (Podcast Generation)
 ```typescript
-const pollStatus = async (podcastId: string) => {
-  const status = await api.get(`/podcasts/${podcastId}/status`);
+const pollStatus = async (podcastId: string): Promise<PodcastStatus> => {
+  const status = await getPodcastStatus(podcastId);
   if (status.status === 'ready') return status;
   if (status.status === 'failed') throw new Error(status.error_message);
-  await sleep(2000);
+  await new Promise(r => setTimeout(r, 3000));
   return pollStatus(podcastId);
 };
 ```
 
 ### 3. Audio Playback
 ```typescript
-const audio = new Audio(`${API_URL}/podcasts/${id}/audio/${sequence}`);
+const audio = new Audio();
+audio.src = `${API_URL}/podcasts/${podcastId}/audio/${sequence}`;
 audio.play();
 audio.onended = () => playNextSegment();
 ```
@@ -209,7 +323,13 @@ audio.onended = () => playNextSegment();
 ```typescript
 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 const recorder = new MediaRecorder(stream);
-// ... record and send to /interaction/ask
+const chunks: Blob[] = [];
+recorder.ondataavailable = (e) => chunks.push(e.data);
+recorder.onstop = () => {
+  const blob = new Blob(chunks, { type: 'audio/webm' });
+  // Send to /interaction/ask
+};
+recorder.start();
 ```
 
 ---
@@ -220,4 +340,4 @@ const recorder = new MediaRecorder(stream);
 - Audio files are MP3 format
 - Podcast generation is async - must poll for status
 - Q&A supports both voice and text input
-- 5-second silence timeout auto-continues podcast
+- Hand raise waits for segment to finish before Q&A

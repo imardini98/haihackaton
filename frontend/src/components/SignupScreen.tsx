@@ -8,6 +8,8 @@ interface SignupScreenProps {
   onBackToLogin?: () => void;
 }
 
+type SignupState = 'form' | 'emailSent';
+
 const ACCENT = '#F59E0B'; // matches the app's amber accent used elsewhere
 const ACCENT_HOVER = '#D97706';
 const INPUT_BORDER_IDLE = 'rgba(255, 255, 255, 0.18)';
@@ -15,6 +17,7 @@ const INPUT_BG = 'rgba(255, 255, 255, 0.10)';
 const INPUT_BG_SOFT = 'rgba(255, 255, 255, 0.06)';
 
 export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
+  const [signupState, setSignupState] = useState<SignupState>('form');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,9 +48,19 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 
     try {
       setIsSubmitting(true);
-      // Backend signup currently accepts {email,password}. First/last name is UI-only for now.
-      const session = await signUp({ email: trimmedEmail, password: trimmedPassword });
-      onSignup(session);
+      const session = await signUp({
+        email: trimmedEmail,
+        password: trimmedPassword,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+      });
+
+      // If access_token is empty, email verification is required
+      if (!session.access_token) {
+        setSignupState('emailSent');
+      } else {
+        onSignup(session);
+      }
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.message || 'Sign up failed.');
@@ -61,8 +74,68 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
     }
   };
 
+  // Email verification sent screen
+  if (signupState === 'emailSent') {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6 py-12 md:px-12 md:py-20 lg:px-24">
+        <div className="w-full max-w-[420px] mx-auto text-center">
+          {/* Logo */}
+          <div className="flex justify-center mb-8 md:mb-10">
+            <img
+              src={logo}
+              alt="PodAsk Logo"
+              className="h-20 md:h-24 w-auto object-contain"
+            />
+          </div>
+
+          {/* Success Icon */}
+          <div className="flex justify-center mb-6">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }}
+            >
+              <svg
+                className="w-8 h-8 text-green-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold text-white mb-3">Check your email</h2>
+          <p className="text-gray-300 mb-2">
+            We've sent a verification link to:
+          </p>
+          <p className="text-white font-medium mb-6">{email}</p>
+          <p className="text-gray-400 text-sm mb-8">
+            Click the link in the email to verify your account, then you can sign in.
+          </p>
+
+          <button
+            type="button"
+            onClick={onBackToLogin}
+            className="w-full py-4 px-8 rounded-xl text-base font-semibold transition-colors text-white shadow-lg"
+            style={{ backgroundColor: ACCENT }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = ACCENT_HOVER)}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = ACCENT)}
+          >
+            Back to Sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12 md:py-16">
+    <div className="min-h-screen flex items-center justify-center px-6 py-12 md:px-12 md:py-20 lg:px-24">
       <div className="w-full max-w-[420px] mx-auto">
         {/* Logo */}
         <div className="flex justify-center mb-8 md:mb-10">

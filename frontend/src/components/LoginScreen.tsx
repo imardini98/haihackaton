@@ -7,6 +7,8 @@ interface LoginScreenProps {
   onLogin: (session: AuthResponse) => void;
   onCreateAccount?: () => void;
   onForgotPassword?: () => void;
+  initialError?: string | null;
+  onClearError?: () => void;
 }
 
 const ACCENT = '#F59E0B'; // matches the app's amber accent used elsewhere
@@ -15,11 +17,18 @@ const INPUT_BORDER_IDLE = 'rgba(255, 255, 255, 0.18)';
 const INPUT_BG = 'rgba(255, 255, 255, 0.10)';
 const INPUT_BG_SOFT = 'rgba(255, 255, 255, 0.06)';
 
-export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: LoginScreenProps) {
+export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword, initialError, onClearError }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Clear initial error when user starts typing
+  const handleInputChange = () => {
+    if (initialError && onClearError) {
+      onClearError();
+    }
+  };
 
   const canSubmit = useMemo(() => {
     return email.trim().length > 0 && password.trim().length > 0;
@@ -55,8 +64,12 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12 md:py-16">
-      <div className="w-full max-w-[420px] mx-auto">
+    <div className="min-h-screen flex">
+      {/* Left spacer - visible on md+ */}
+      <div className="hidden md:block md:flex-1" />
+
+      {/* Center content */}
+      <div className="w-full md:w-[400px] md:flex-shrink-0 flex flex-col justify-center px-6 py-12">
         {/* Logo */}
         <div className="flex justify-center mb-8 md:mb-10">
           <img
@@ -71,7 +84,7 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); handleInputChange(); }}
             autoComplete="email"
             placeholder="Email"
             disabled={isSubmitting}
@@ -88,7 +101,7 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); handleInputChange(); }}
             autoComplete="current-password"
             placeholder="Password"
             disabled={isSubmitting}
@@ -195,6 +208,9 @@ export function LoginScreen({ onLogin, onCreateAccount, onForgotPassword }: Logi
           </div>
         </form>
       </div>
+
+      {/* Right spacer - visible on md+ */}
+      <div className="hidden md:block md:flex-1" />
     </div>
   );
 }
