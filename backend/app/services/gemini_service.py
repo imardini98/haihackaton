@@ -100,11 +100,10 @@ class GeminiService:
                                 "items": {
                                     "type": "object",
                                     "properties": {
-                                        "speaker": {"type": "string"},
-                                        "voice_id": {"type": "string"},
+                                        "speaker": {"type": "string", "enum": ["host", "expert"]},
                                         "text": {"type": "string"}
                                     },
-                                    "required": ["speaker", "voice_id", "text"]
+                                    "required": ["speaker", "text"]
                                 }
                             },
                             "transition_to_question": {"type": "string"},

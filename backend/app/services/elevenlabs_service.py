@@ -62,11 +62,17 @@ class ElevenLabsService:
         """Generate audio for a full segment dialogue with both host and expert voices."""
         settings = get_settings()
 
+        # Debug: log dialogue structure
+        print(f"[TTS] Generating audio for segment {segment_id}")
+        print(f"[TTS] Dialogue has {len(dialogue)} lines")
+        for i, line in enumerate(dialogue):
+            print(f"[TTS] Line {i}: speaker={line.get('speaker', 'MISSING')}, text={line.get('text', '')[:50]}...")
+
         # Generate audio for each line
         audio_files: List[str] = []
 
         for i, line in enumerate(dialogue):
-            speaker = line.get("speaker", "host")
+            speaker = line.get("speaker", "host").lower().strip()
             text = line.get("text", "")
 
             if not text:
