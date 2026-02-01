@@ -220,8 +220,14 @@ Respond ONLY with a JSON object. Do not include any pre-text or post-text.
 
 ## SEGMENT GUIDELINES
 
+**CRITICAL - CONSISTENT SEGMENT LENGTH:**
+- **EVERY segment must be 60-90 words total** (about 25-35 seconds when spoken)
+- **Each segment should have 4-6 dialogue exchanges** (2-3 HOST lines + 2-3 EXPERT lines)
+- **The LAST segment must be the SAME LENGTH as all other segments** - do NOT dump remaining content there
+- If you have more content, create MORE segments instead of making segments longer
+- Split long explanations across multiple segments naturally
+
 Each segment should:
-- **Last 15-25 seconds when spoken** (short enough so users don't wait long if they raise hand)
 - Feel like a natural conversation, not a lecture
 - End at a logical pause point where a listener could "raise their hand"
 - ALL segments must have `transition_to_question` and `resume_phrase`
