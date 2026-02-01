@@ -20,5 +20,8 @@ arxiv>=2.1.0
 pikepdf>=8.0.0
 requests>=2.31.0
 
+# Audio processing
+pydub>=0.25.0
+
 # Utilities
 python-dotenv>=1.0.0
