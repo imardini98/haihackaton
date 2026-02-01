@@ -1,6 +1,7 @@
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import Optional
+import json, time
 
 from app.schemas.paper import (
     PaperSearchRequest,
@@ -12,6 +13,17 @@ from app.schemas.paper import (
 from app.services.arxiv_service import arxiv_service
 from app.services.supabase_service import supabase_service
 from app.api.dependencies import get_current_user
+
+# #region agent log
+LOG_PATH = r"e:\Hackathon\odask\haihackaton\backend\debug.log"
+def _debug_log(hyp, loc, msg, data=None):
+    try:
+        with open(LOG_PATH, "a") as f:
+            f.write(json.dumps({"hypothesisId":hyp,"location":loc,"message":msg,"data":data,"timestamp":int(time.time()*1000),"sessionId":"debug-session"})+"\n")
+        print(f"DEBUG: {loc} - {msg}")
+    except Exception as ex:
+        print(f"DEBUG_LOG_ERROR: {ex}")
+# #endregion
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -50,11 +62,41 @@ async def ingest_paper(
     current_user: dict = Depends(get_current_user)
 ):
     """Ingest a paper from ArXiv by ID and save to database."""
+    # #region agent log
+    _debug_log("B", "papers.py:ingest_paper:entry", "Ingest started", {"arxiv_id": request.arxiv_id, "current_user_type": str(type(current_user)), "current_user_repr": repr(current_user)[:300]})
+    # #endregion
+    
+    try:
+        # #region agent log
+        _debug_log("B", "papers.py:ingest_paper:access_user_id", "Attempting to access current_user.id", {"has_id": hasattr(current_user, 'id')})
+        # #endregion
+        user_id_test = current_user.id  # Test if this works
+        # #region agent log
+        _debug_log("B", "papers.py:ingest_paper:user_id_success", "Got user_id", {"user_id": str(user_id_test)})
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        _debug_log("B", "papers.py:ingest_paper:user_id_error", "Failed to get user_id", {"error": str(e), "error_type": str(type(e))})
+        # #endregion
+        raise
+    
     # Check if paper already exists
-    existing = await supabase_service.select(
-        "papers",
-        filters={"arxiv_id": request.arxiv_id}
-    )
+    # #region agent log
+    _debug_log("D", "papers.py:ingest_paper:before_select", "About to check existing papers", {"arxiv_id": request.arxiv_id})
+    # #endregion
+    try:
+        existing = await supabase_service.select(
+            "papers",
+            filters={"arxiv_id": request.arxiv_id}
+        )
+        # #region agent log
+        _debug_log("D", "papers.py:ingest_paper:after_select", "Select completed", {"existing_count": len(existing) if existing else 0})
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        _debug_log("D", "papers.py:ingest_paper:select_error", "Select failed", {"error": str(e), "error_type": str(type(e))})
+        # #endregion
+        raise
     if existing:
         # Return existing paper
         paper = existing[0]
@@ -72,7 +114,19 @@ async def ingest_paper(
         )
 
     # Fetch from ArXiv
-    arxiv_paper = await arxiv_service.get_by_id(request.arxiv_id)
+    # #region agent log
+    _debug_log("E", "papers.py:ingest_paper:before_arxiv", "About to fetch from arxiv", {"arxiv_id": request.arxiv_id})
+    # #endregion
+    try:
+        arxiv_paper = await arxiv_service.get_by_id(request.arxiv_id)
+        # #region agent log
+        _debug_log("E", "papers.py:ingest_paper:after_arxiv", "Arxiv fetch done", {"found": arxiv_paper is not None, "title": arxiv_paper.title[:50] if arxiv_paper else None})
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        _debug_log("E", "papers.py:ingest_paper:arxiv_error", "Arxiv fetch failed", {"error": str(e), "error_type": str(type(e))})
+        # #endregion
+        raise
     if not arxiv_paper:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -81,6 +135,9 @@ async def ingest_paper(
 
     # Get content (abstract for MVP)
     content = await arxiv_service.get_paper_content(request.arxiv_id)
+    # #region agent log
+    _debug_log("E", "papers.py:ingest_paper:got_content", "Got paper content", {"content_length": len(content) if content else 0})
+    # #endregion
 
     # Save to database
     paper_data = {
@@ -95,7 +152,19 @@ async def ingest_paper(
         "user_id": current_user.id
     }
 
-    saved = await supabase_service.insert("papers", paper_data)
+    # #region agent log
+    _debug_log("F", "papers.py:ingest_paper:before_insert", "About to insert paper", {"paper_data_keys": list(paper_data.keys()), "user_id": paper_data.get("user_id")})
+    # #endregion
+    try:
+        saved = await supabase_service.insert("papers", paper_data)
+        # #region agent log
+        _debug_log("F", "papers.py:ingest_paper:after_insert", "Insert completed", {"saved": saved is not None, "saved_id": saved.get("id") if saved else None})
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        _debug_log("F", "papers.py:ingest_paper:insert_error", "Insert failed", {"error": str(e)[:300], "error_type": str(type(e))})
+        # #endregion
+        raise
     if not saved:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

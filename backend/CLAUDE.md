@@ -16,7 +16,7 @@ FastAPI backend to orchestrate the PodAsk AI platform - transforming scientific 
 | **Database** | Supabase (PostgreSQL) | Hosted, built-in auth |
 | **Auth** | Supabase Email/Password | Simple signup/login |
 | **LLM** | Gemini 1.5 Pro | Script generation, Q&A |
-| **TTS** | ElevenLabs | Two voices (HOST + EXPERT) |
+| **TTS** | ElevenLabs v3 | Two voices (HOST + EXPERT) with audio tags |
 | **STT** | ElevenLabs | Transcribe user questions |
 | **Papers** | ArXiv API | Research paper ingestion |
 | **Audio Storage** | Local filesystem | Railway persistent storage |
@@ -205,27 +205,39 @@ Generates transition when user signals to continue.
 
 ## Voice Configuration
 
-Two distinct voices via ElevenLabs:
+Two distinct voices via ElevenLabs v3:
 
-| Role    | Characteristics                          | Voice Style         |
-|---------|------------------------------------------|---------------------|
-| HOST    | Warm, curious, guides conversation       | Friendly, engaging  |
-| EXPERT  | Knowledgeable, explains findings         | Confident, clear    |
+| Role    | Characteristics                          | Voice Style         | Audio Tags Usage |
+|---------|------------------------------------------|---------------------|------------------|
+| HOST    | Warm, curious, guides conversation       | Friendly, engaging  | [chuckles], [gasps], [thoughtful], [short pause] |
+| EXPERT  | Knowledgeable, explains findings         | Confident, clear    | [clears throat], [inhales], [thoughtful], [short pause] |
 
 ```python
 VOICES = {
     "host": {
         "voice_id": "{{ELEVENLABS_HOST_VOICE_ID}}",
+        "model_id": "eleven_turbo_v2_5",  # v3 compatible
         "stability": 0.5,
         "similarity_boost": 0.75
     },
     "expert": {
         "voice_id": "{{ELEVENLABS_EXPERT_VOICE_ID}}",
+        "model_id": "eleven_turbo_v2_5",  # v3 compatible
         "stability": 0.6,
         "similarity_boost": 0.8
     }
 }
 ```
+
+**v3 Audio Tags:**
+Text can include square bracket tags for natural expression:
+- Pauses: `[short pause]`, `[long pause]`
+- Breath: `[inhales]`, `[exhales]`
+- Reactions: `[gasps]`, `[sighs]`, `[clears throat]`
+- Laughter: `[chuckles]`, `[laughs]`, `[giggles]`
+- Emotion: `[thoughtful]`, `[confused]`, `[relieved]`
+
+See `AUDIO_TAGS_GUIDE.md` for complete reference.
 
 ---
 
@@ -452,9 +464,10 @@ SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=           # For server-side operations
 
-# ElevenLabs Voice Config
+# ElevenLabs Voice Config (v3)
 ELEVENLABS_HOST_VOICE_ID=       # HOST voice
 ELEVENLABS_EXPERT_VOICE_ID=     # EXPERT voice
+ELEVENLABS_MODEL_ID=eleven_turbo_v2_5  # v3 compatible model with audio tags
 
 # App Config
 APP_ENV=development
@@ -554,7 +567,7 @@ supabase>=2.0.0
 
 # AI/ML
 google-generativeai>=0.3.0
-elevenlabs>=1.0.0
+elevenlabs>=1.9.0  # v3 API with audio tags support
 
 # Paper Ingestion
 arxiv>=2.1.0

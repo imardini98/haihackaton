@@ -66,6 +66,7 @@ Generate a natural HOST acknowledgment + EXPERT answer exchange. The host briefl
   - "Ah yes, let's pause on that—"
   - "Good timing, I was curious about that too—"
 - Does NOT answer the question, just bridges to the expert
+- **Use audio tags:** `[thoughtful]`, `[chuckles]`, `[short pause]` for natural delivery
 
 ### EXPERT
 - Confident but approachable
@@ -74,6 +75,19 @@ Generate a natural HOST acknowledgment + EXPERT answer exchange. The host briefl
 - Ends with the answer, no questions back
 - No "does that help?" or "let me know if..."
 - Just delivers the knowledge, then stops
+- **Use audio tags:** `[clears throat]`, `[inhales]`, `[short pause]` for clarity
+
+### Audio Tags
+Use v3 audio tags in square brackets for natural expression:
+- `[thoughtful]` - For contemplative moments
+- `[chuckles]` - For warmth and engagement
+- `[short pause]` - For pacing
+- `[inhales]`, `[exhales]` - For natural breathing
+- `[clears throat]` - Before explanations
+
+Examples:
+- HOST: `"[thoughtful] Oh, that's a great question! [short pause] What do you think?"`
+- EXPERT: `"[clears throat] Let me explain. [inhales] The key factor here is..."`
 
 ## FLOW AFTER ANSWER
 
@@ -111,8 +125,8 @@ Generate a natural HOST acknowledgment + EXPERT answer exchange. The host briefl
 ```json
 {
   "exchange": {
-    "host_acknowledgment": "Oh, good catch—yeah, that number stood out to me too. How did they actually measure that?",
-    "expert_answer": "So the 23% comes from comparing F1 scores between their new model and the baseline. Their hierarchical attention approach hit 0.89, while the standard ResNet-50 was at 0.72. They ran this across 12,000 CT scans from three different hospitals to make sure it wasn't just working on one dataset. The p-value came in under 0.001, so statistically it's solid.",
+    "host_acknowledgment": "[thoughtful] Oh, good catch—yeah, that number stood out to me too. [short pause] How did they actually measure that?",
+    "expert_answer": "[clears throat] So the 23% comes from comparing F1 scores between their new model and the baseline. [short pause] Their hierarchical attention approach hit 0.89, while the standard ResNet-50 was at 0.72. They ran this across 12,000 CT scans from three different hospitals to make sure it wasn't just working on one dataset. [inhales] The p-value came in under 0.001, so statistically it's solid.",
     "voice_ids": {
       "host": "host_voice_id",
       "expert": "expert_voice_id"

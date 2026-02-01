@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     # ElevenLabs Voice Config
     elevenlabs_host_voice_id: str = ""
     elevenlabs_expert_voice_id: str = ""
+    elevenlabs_model_id: str = "eleven_v3"  # Actual v3 model for audio tags
+    enable_audio_tags: bool = True  # Set to False if tags are spoken as words
 
     # App Config
     app_env: str = "development"
