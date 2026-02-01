@@ -14,6 +14,7 @@ from app.schemas.podcast import (
 )
 from app.services.podcast_service import podcast_service
 from app.services.supabase_service import supabase_service
+from app.services.minimax_service import minimax_service
 from app.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/podcasts", tags=["podcasts"])
@@ -53,6 +54,7 @@ def _format_podcast_response(podcast: dict, include_segments: bool = False) -> P
         paper_ids=[str(pid) for pid in podcast.get("paper_ids", [])],
         status=podcast["status"],
         total_duration_seconds=podcast.get("total_duration_seconds"),
+        thumbnail_url=podcast.get("thumbnail_url"),
         error_message=podcast.get("error_message"),
         created_at=podcast["created_at"],
         segments=segments
@@ -205,6 +207,89 @@ async def get_segment_audio(
         audio_path,
         media_type="audio/mpeg",
         filename=f"segment_{segment_sequence}.mp3"
+    )
+
+
+@router.post("/{podcast_id}/thumbnail")
+async def generate_podcast_thumbnail(
+    podcast_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate or regenerate thumbnail for a podcast."""
+    # Verify ownership
+    podcasts = await supabase_service.select(
+        "podcasts",
+        filters={"id": podcast_id}
+    )
+    if not podcasts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Podcast not found"
+        )
+    
+    podcast = podcasts[0]
+    if podcast.get("user_id") != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Generate thumbnail
+    topic = podcast.get("topic", podcast.get("title", "Podcast"))
+    thumbnail_url = await minimax_service.generate_thumbnail(
+        topic=topic,
+        filename="thumbnail.jpeg",
+        user_id=current_user.id,
+        podcast_id=podcast_id
+    )
+    
+    if not thumbnail_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate thumbnail"
+        )
+    
+    # Update database
+    await supabase_service.update(
+        "podcasts",
+        {"thumbnail_url": thumbnail_url},
+        {"id": podcast_id}
+    )
+    
+    return {"thumbnail_url": thumbnail_url}
+
+
+@router.get("/{podcast_id}/thumbnail")
+async def get_podcast_thumbnail(podcast_id: str):
+    """Get thumbnail image for a podcast (public endpoint)."""
+    podcasts = await supabase_service.select(
+        "podcasts",
+        filters={"id": podcast_id}
+    )
+    if not podcasts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Podcast not found"
+        )
+    
+    podcast = podcasts[0]
+    thumbnail_url = podcast.get("thumbnail_url")
+    if not thumbnail_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thumbnail not found"
+        )
+    
+    thumbnail_path = Path(thumbnail_url)
+    if not thumbnail_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thumbnail file not found"
+        )
+    
+    return FileResponse(
+        thumbnail_path,
+        media_type="image/jpeg"
     )
 
 

@@ -36,6 +36,7 @@ class PodcastResponse(BaseModel):
     paper_ids: list[str]
     status: str
     total_duration_seconds: Optional[int] = None
+    thumbnail_url: Optional[str] = None
     error_message: Optional[str] = None
     created_at: str
     segments: list[SegmentResponse] = []

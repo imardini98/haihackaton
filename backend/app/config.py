@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # API Keys
     gemini_api_key: str = ""
     elevenlabs_api_key: str = ""
+    minimax_api_key: str = ""
 
     # Supabase
     supabase_url: str = ""

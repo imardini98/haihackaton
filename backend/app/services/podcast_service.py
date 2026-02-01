@@ -4,6 +4,7 @@ from typing import Optional
 from app.services.supabase_service import supabase_service
 from app.services.gemini_service import gemini_service
 from app.services.elevenlabs_service import elevenlabs_service
+from app.services.minimax_service import minimax_service
 
 
 class PodcastService:
@@ -65,12 +66,27 @@ class PodcastService:
             title = script.get("metadata", {}).get("title", f"Podcast: {topic}")
             summary = script.get("metadata", {}).get("summary", "")
 
+            user_id = podcast.get("user_id")
+            
+            # Generate thumbnail image
+            thumbnail_url = None
+            try:
+                thumbnail_url = await minimax_service.generate_thumbnail(
+                    topic=topic,
+                    filename="thumbnail.jpeg",
+                    user_id=user_id,
+                    podcast_id=podcast_id
+                )
+            except Exception as e:
+                print(f"Thumbnail generation failed: {e}")
+
             await supabase_service.update(
                 "podcasts",
                 {
                     "title": title,
                     "summary": summary,
-                    "script_json": script
+                    "script_json": script,
+                    "thumbnail_url": thumbnail_url
                 },
                 {"id": podcast_id}
             )
@@ -78,7 +94,6 @@ class PodcastService:
             # Create segments and generate audio
             segments = script.get("segments", [])
             total_duration = 0
-            user_id = podcast.get("user_id")
 
             for segment_data in segments:
                 segment = await self._create_segment(podcast_id, segment_data, user_id)
