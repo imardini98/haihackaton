@@ -5,6 +5,8 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { PlayerScreen } from './components/PlayerScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { SignupScreen } from './components/SignupScreen';
+import { ForgotPasswordScreen } from './components/ForgotPasswordScreen';
+import { ResetPasswordScreen } from './components/ResetPasswordScreen';
 import { getMe, type AuthResponse } from './api/auth';
 
 type AppState = 'landing' | 'research' | 'loading' | 'player';
@@ -12,6 +14,35 @@ type AuthState = 'unknown' | 'authenticated' | 'unauthenticated';
 
 const LEGACY_AUTH_STORAGE_KEY = 'podask.authenticated';
 const SESSION_STORAGE_KEY = 'podask.session';
+
+function getRecoveryAccessTokenFromUrl(): string | null {
+  try {
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+    const hashParams = new URLSearchParams(hash);
+    const queryParams = new URLSearchParams(window.location.search);
+    return (
+      hashParams.get('access_token') ||
+      queryParams.get('access_token') ||
+      queryParams.get('token')
+    );
+  } catch {
+    return null;
+  }
+}
+
+function stripRecoveryParamsFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.hash = '';
+    url.searchParams.delete('access_token');
+    url.searchParams.delete('refresh_token');
+    url.searchParams.delete('token');
+    url.searchParams.delete('type');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  } catch {
+    // ignore
+  }
+}
 
 function getStoredSession(): AuthResponse | null {
   try {
@@ -31,7 +62,8 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>('landing');
   const [topic, setTopic] = useState('');
   const [authState, setAuthState] = useState<AuthState>('unknown');
-  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'forgotPassword' | 'resetPassword'>('login');
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +103,15 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const token = getRecoveryAccessTokenFromUrl();
+    if (token) {
+      setRecoveryToken(token);
+      setAuthView('resetPassword');
+      stripRecoveryParamsFromUrl();
+    }
+  }, []);
+
   const handleGeneratePodcast = (userTopic: string) => {
     setTopic(userTopic);
     setAppState('research');
@@ -104,6 +145,7 @@ export default function App() {
     }
     setAuthState('unauthenticated');
     setAuthView('login');
+    setRecoveryToken(null);
     handleBackToLanding();
   };
 
@@ -126,8 +168,22 @@ export default function App() {
       ) : authState !== 'authenticated' ? (
         authView === 'signup' ? (
           <SignupScreen onSignup={handleLogin} onBackToLogin={() => setAuthView('login')} />
+        ) : authView === 'forgotPassword' ? (
+          <ForgotPasswordScreen onBackToLogin={() => setAuthView('login')} />
+        ) : authView === 'resetPassword' ? (
+          <ResetPasswordScreen
+            accessToken={recoveryToken || ''}
+            onBackToLogin={() => {
+              setRecoveryToken(null);
+              setAuthView('login');
+            }}
+          />
         ) : (
-          <LoginScreen onLogin={handleLogin} onCreateAccount={() => setAuthView('signup')} />
+          <LoginScreen
+            onLogin={handleLogin}
+            onCreateAccount={() => setAuthView('signup')}
+            onForgotPassword={() => setAuthView('forgotPassword')}
+          />
         )
       ) : (
         <>

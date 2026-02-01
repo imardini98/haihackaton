@@ -43,3 +43,30 @@ export async function getMe(accessToken: string): Promise<UserResponse> {
   });
 }
 
+export type PasswordResetRequest = {
+  email: string;
+};
+
+export type PasswordResetResponse = {
+  message: string;
+};
+
+export async function requestPasswordReset(payload: PasswordResetRequest): Promise<PasswordResetResponse> {
+  return requestJson<PasswordResetResponse>('/api/v1/auth/password-reset', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type PasswordUpdateRequest = {
+  new_password: string;
+};
+
+export async function updatePassword(accessToken: string, payload: PasswordUpdateRequest): Promise<PasswordResetResponse> {
+  return requestJson<PasswordResetResponse>('/api/v1/auth/password-update', {
+    method: 'POST',
+    token: accessToken,
+    body: JSON.stringify(payload),
+  });
+}
+
