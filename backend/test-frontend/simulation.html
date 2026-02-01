@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PodAsk – AI Development Podcast Simulation</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .simulation-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #eee; padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+      .simulation-header h1 { margin: 0 0 0.25rem 0; font-size: 1.25rem; }
+      .simulation-header p { margin: 0; opacity: 0.9; font-size: 0.9rem; }
+      .now-playing { background: #f0f7ff; border-left: 4px solid #2563eb; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+      .now-playing .topic { font-weight: 600; color: #1e40af; margin-bottom: 0.5rem; }
+      .dialogue-line { margin: 0.4rem 0; padding: 0.35rem 0; border-bottom: 1px solid #e5e7eb; transition: background 0.2s; }
+      .dialogue-line.active { background: #dbeafe; border-radius: 4px; padding-left: 0.5rem; margin-left: -0.5rem; }
+      .dialogue-line .speaker { font-weight: 600; color: #374151; margin-right: 0.5rem; }
+      .raise-hand-box { background: #fefce8; border: 1px solid #eab308; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+      .raise-hand-box h3 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+      .simulate-research { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: #1e3a5f; color: #fff; border-radius: 6px; margin-top: 0.5rem; font-size: 0.9rem; border: none; cursor: pointer; }
+      .simulate-research:disabled { opacity: 0.6; cursor: not-allowed; }
+      .simulate-research.loading { opacity: 0.8; }
+      .simulate-research .spinner { width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .answer-box { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 1rem; border-radius: 6px; margin-top: 1rem; }
+      .answer-box .label { font-weight: 600; color: #15803d; margin-bottom: 0.5rem; }
+      .log-compact { max-height: 200px; overflow-y: auto; font-size: 0.8rem; }
+      .qa-paused { background: #fef3c7; padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.75rem; font-size: 0.9rem; }
+      .audio-player-box { background: #1e293b; color: #fff; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+      .audio-player-box .status { font-size: 0.9rem; margin-bottom: 0.5rem; }
+      .audio-player-box .status .icon { margin-right: 0.5rem; }
+      .audio-player-box audio { width: 100%; }
+      .generating { color: #fbbf24; }
+      .playing { color: #4ade80; }
+      .paused { color: #f87171; }
+      #playbackStatus { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="simulation-header">
+        <h1>PodAsk – AI Development Podcast Simulation</h1>
+        <p>Listen to the podcast with real TTS audio. Raise your hand to interrupt and ask a question.</p>
+      </header>
+
+      <section class="card">
+        <h2>API</h2>
+        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem;"><strong>1.</strong> Start the backend: <code>cd backend && python run.py</code></p>
+        <p style="margin: 0 0 0.5rem 0; font-size: 0.9rem;"><strong>2.</strong> Serve this page (pick one):</p>
+        <ul style="margin: 0 0 0.5rem 0; padding-left: 1.25rem; font-size: 0.9rem;">
+          <li>From <strong>backend</strong> folder: <code>python -m http.server 5173</code> → open <a href="http://localhost:5173/test-frontend/simulation.html" target="_blank">http://localhost:5173/test-frontend/simulation.html</a></li>
+          <li>From repo root: <code>python -m http.server 5173</code> → open <a href="http://localhost:5173/backend/test-frontend/simulation.html" target="_blank">http://localhost:5173/backend/test-frontend/simulation.html</a></li>
+        </ul>
+        <div class="row">
+          <label for="baseUrl">Base URL</label>
+          <input id="baseUrl" type="text" value="http://127.0.0.1:8001" />
+        </div>
+        <div class="row actions" style="margin-top: 0.5rem;">
+          <button id="testConnectionBtn" type="button">Test connection</button>
+          <span id="connectionStatus"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>1. Start podcast</h2>
+        <p>Click to generate audio for the first segment and start playing. You can raise your hand to interrupt at any time.</p>
+        <div class="row actions">
+          <button id="startPodcastBtn" type="button">Start AI Development Podcast</button>
+        </div>
+        <div class="row">
+          <label>Session</label>
+          <div id="sessionInfo" class="mono">Not started</div>
+        </div>
+      </section>
+
+      <section class="card" id="playerSection" style="display: none;">
+        <h2>2. Audio Player</h2>
+        <div class="audio-player-box">
+          <div class="status">
+            <span class="icon" id="statusIcon">🔊</span>
+            <span id="playbackStatus">Ready</span>
+          </div>
+          <audio id="audioPlayer" controls></audio>
+        </div>
+        <div id="nowPlaying" class="now-playing">
+          <div class="topic" id="segmentTopic">–</div>
+          <div id="segmentDialogue"></div>
+        </div>
+        <div class="row actions">
+          <button id="skipSegmentBtn" type="button">Skip to next segment</button>
+        </div>
+      </section>
+
+      <section class="card" id="raiseHandSection" style="display: none;">
+        <h2>3. Raise hand (interrupt)</h2>
+        <p id="qaPausedHint" class="qa-paused" style="display: none;">Podcast paused – ask your question below.</p>
+        <div class="raise-hand-box">
+          <h3>Ask a question</h3>
+          <div class="row">
+            <input id="questionInput" type="text" placeholder="e.g. How does training work? What about deployment?" />
+          </div>
+          <button id="raiseHandBtn" type="button" class="simulate-research">Raise hand & ask</button>
+          <div id="answerBox" class="answer-box" style="display: none;">
+            <div class="label">Answer</div>
+            <div id="answerContent"></div>
+          </div>
+        </div>
+        <div class="row actions">
+          <button id="resumeAfterQaBtn" type="button" style="display: none;">Resume podcast</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Log</h2>
+        <pre id="log" class="log log-compact"></pre>
+      </section>
+    </div>
+
+    <script src="./simulation.js"></script>
+  </body>
+</html>

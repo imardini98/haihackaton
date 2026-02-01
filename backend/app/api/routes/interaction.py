@@ -44,6 +44,10 @@ class ContinueResponse(BaseModel):
     next_segment_id: int | None = None
 
 
+class ProvideAnswerRequest(BaseModel):
+    answer_dialogue: list[dict]
+
+
 class SessionStartRequest(BaseModel):
     podcast_id: str
     user_id: str | None = None
@@ -208,10 +212,10 @@ async def request_clarification(session_id: str):
 
 
 @router.post("/{session_id}/answer")
-async def provide_answer_temp(session_id: str, answer_dialogue: list[dict]):
+async def provide_answer_temp(session_id: str, request: ProvideAnswerRequest):
     """Provide answer (temporary)"""
     try:
-        result = segment_manager.provide_answer(session_id, answer_dialogue)
+        result = segment_manager.provide_answer(session_id, request.answer_dialogue)
         
         # Get session voices
         voices = voice_service.get_session_voices(session_id)

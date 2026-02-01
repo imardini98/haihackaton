@@ -1,0 +1,95 @@
+{
+  "metadata": {
+    "title": "AI Development: From Theory to Practice",
+    "summary": "A guided tour of modern AI development—large language models, training pipelines, and responsible deployment. We cover key papers and practices so you can separate hype from reality.",
+    "sources_analyzed": 4,
+    "estimated_duration_minutes": 12,
+    "primary_topics": ["LLMs", "training", "deployment", "ethics", "AI safety"],
+    "voices": {
+      "host": "host_voice_id",
+      "expert": "expert_voice_id"
+    }
+  },
+  "segments": [
+    {
+      "id": 1,
+      "topic_label": "Introduction",
+      "dialogue": [
+        {
+          "speaker": "host",
+          "text": "Welcome to PodAsk. Today we're talking AI development—how models are built, trained, and shipped. What's the landscape look like right now?"
+        },
+        {
+          "speaker": "expert",
+          "text": "We're past the 'it might work' phase. LLMs are in production everywhere. The real questions now are scale, cost, and how to train and deploy responsibly."
+        }
+      ],
+      "key_terms": ["LLM", "training", "deployment"],
+      "difficulty_level": "beginner",
+      "source_reference": "Overview",
+      "is_interruptible": true,
+      "transition_to_question": "Any questions before we dive in?",
+      "resume_phrase": "Let's get into how these models are actually trained."
+    },
+    {
+      "id": 2,
+      "topic_label": "Training pipelines",
+      "dialogue": [
+        {
+          "speaker": "host",
+          "text": "Walk us through a typical training pipeline. What does 'training' actually mean for a big model?"
+        },
+        {
+          "speaker": "expert",
+          "text": "You have data—text or multimodal—then you run a massive optimization loop. The model adjusts billions of parameters to predict the next token. It's compute-heavy and data quality matters as much as size."
+        }
+      ],
+      "key_terms": ["training", "parameters", "tokens", "compute"],
+      "difficulty_level": "intermediate",
+      "source_reference": "Paper_01_Training",
+      "is_interruptible": true,
+      "transition_to_question": "Questions on the training process?",
+      "resume_phrase": "Now, what about after training—deployment?"
+    },
+    {
+      "id": 3,
+      "topic_label": "Deployment and scaling",
+      "dialogue": [
+        {
+          "speaker": "host",
+          "text": "So the model is trained. How do teams actually ship it?"
+        },
+        {
+          "speaker": "expert",
+          "text": "Inference is a different beast. You need batching, caching, and often smaller or distilled models for latency. Many companies use APIs from OpenAI, Anthropic, or self-host with vLLM, TGI, or similar."
+        }
+      ],
+      "key_terms": ["inference", "latency", "API", "vLLM"],
+      "difficulty_level": "intermediate",
+      "source_reference": "Paper_02_Deployment",
+      "is_interruptible": true,
+      "transition_to_question": "Anything unclear about deployment?",
+      "resume_phrase": "Let's touch on safety and ethics."
+    },
+    {
+      "id": 4,
+      "topic_label": "Safety and ethics",
+      "dialogue": [
+        {
+          "speaker": "host",
+          "text": "What should developers keep in mind around safety and ethics?"
+        },
+        {
+          "speaker": "expert",
+          "text": "Alignment—making the model do what we want—and robustness. Red-teaming, evals, and clear use policies. It's not optional anymore; regulators and users expect it."
+        }
+      ],
+      "key_terms": ["alignment", "red-teaming", "evals", "ethics"],
+      "difficulty_level": "beginner",
+      "source_reference": "Paper_03_Safety",
+      "is_interruptible": true,
+      "transition_to_question": "Questions on safety or ethics?",
+      "resume_phrase": "We'll wrap with a quick recap."
+    }
+  ]
+}

@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
-from app.api.routes import auth, health, podcasts, interaction, audio_files
+from app.api.routes import auth, health, podcasts, interaction, audio_files, simulation
 
 
 @asynccontextmanager
@@ -33,11 +33,12 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.is_development else None,
     )
 
-    # CORS
+    # CORS — in development allow all origins so simulation works from file:// or any localhost
+    cors_origins = ["*"] if settings.is_development else settings.cors_origins_list
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials=cors_origins != ["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     app.include_router(podcasts.router, prefix="/api/v1")
     app.include_router(interaction.router, prefix="/api/v1")
     app.include_router(audio_files.router, prefix="/api/v1")
+    app.include_router(simulation.router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
