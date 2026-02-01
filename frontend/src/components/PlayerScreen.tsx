@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Hand, Shuffle, Repeat, ArrowLeft, MoreVertical, Loader2 } from 'lucide-react';
 import { QuestionModal } from './QuestionModal';
+import { AnswerModal } from './AnswerModal';
 import { HandRaiseAnimation } from './HandRaiseAnimation';
-import { getPodcast, getSegmentAudioUrl, type Podcast, type Segment } from '../api/podcasts';
+import { getPodcast, type Podcast } from '../api/podcasts';
+import {
+  startSession,
+  updateSession,
+  askTextQuestion,
+  askVoiceQuestion,
+  continueSession,
+  type AskResponse,
+  type ProcessVoiceResponse
+} from '../api/interaction';
 import { getApiBaseUrl } from '../api/http';
 
 interface PlayerScreenProps {
@@ -29,6 +39,7 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   const [currentTime, setCurrentTime] = useState(0);
   const [showHandAnimation, setShowHandAnimation] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
 
   // Podcast state
   const [podcast, setPodcast] = useState<Podcast | null>(null);
@@ -37,15 +48,25 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   const [error, setError] = useState<string | null>(null);
   const [isAudioReady, setIsAudioReady] = useState(false);
 
+  // Session state (for Q&A)
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
+  const [currentAnswer, setCurrentAnswer] = useState<AskResponse | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string>('');
+  const [isLoadingResume, setIsLoadingResume] = useState(false);
+
   // Dual audio buffer refs for seamless playback
   const currentAudioRef = useRef<AudioBuffer | null>(null);
   const nextAudioRef = useRef<AudioBuffer | null>(null);
   const segmentStartTimeRef = useRef(0);
   const preloadedSegmentsRef = useRef<Map<number, string>>(new Map());
-  
+
   // Track actual audio durations (from loaded audio files)
   const actualDurationsRef = useRef<Map<number, number>>(new Map());
-  const [durationsLoaded, setDurationsLoaded] = useState(0); // trigger re-render when durations update
+  const [durationsLoaded, setDurationsLoaded] = useState(0);
+
+  // Resume audio ref
+  const resumeAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get actual duration for a segment (prefer actual, fallback to API, then 60s)
   const getSegmentDuration = useCallback((segmentIndex: number): number => {
@@ -86,6 +107,34 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
 
     loadPodcast();
   }, [podcastId, token]);
+
+  // Start listening session when podcast loads
+  useEffect(() => {
+    if (!podcast?.segments?.length || !podcastId || !token || sessionId) return;
+
+    const initSession = async () => {
+      try {
+        const firstSegment = podcast.segments[0];
+        const session = await startSession(podcastId, firstSegment.id, token);
+        setSessionId(session.session_id);
+      } catch (err) {
+        console.error('Failed to start session:', err);
+        // Non-fatal - Q&A won't work but playback continues
+      }
+    };
+
+    initSession();
+  }, [podcast?.segments, podcastId, token, sessionId]);
+
+  // Update session when segment changes
+  useEffect(() => {
+    if (!sessionId || !token || !podcast?.segments) return;
+
+    const currentSeg = podcast.segments[currentSegmentIndex];
+    if (!currentSeg) return;
+
+    updateSession(sessionId, currentSeg.id, token).catch(console.error);
+  }, [sessionId, currentSegmentIndex, token, podcast?.segments]);
 
   // Get current segment
   const currentSegment = podcast?.segments?.[currentSegmentIndex];
@@ -140,22 +189,22 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     const audio = new Audio();
     audio.src = blobUrl;
     audio.preload = 'auto';
-    
+
     // Capture actual duration when metadata loads
     audio.addEventListener('loadedmetadata', () => {
       if (audio.duration && audio.duration > 0 && isFinite(audio.duration)) {
         actualDurationsRef.current.set(segmentIndex, audio.duration);
-        setDurationsLoaded(prev => prev + 1); // Trigger re-render to update timeline
+        setDurationsLoaded(prev => prev + 1);
       }
     });
-    
+
     // Attach ended listener immediately (uses callback ref to avoid stale closures)
     audio.addEventListener('ended', () => {
       if (onSegmentEndCallback) {
         onSegmentEndCallback(segmentIndex);
       }
     });
-    
+
     return {
       audio,
       segmentIndex,
@@ -201,13 +250,13 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     };
   }, [podcast?.segments, podcastId, token, fetchSegmentAudio, createAudioBuffer]);
 
-  // Handle segment end callback (called from audio 'ended' event attached in createAudioBuffer)
+  // Handle segment end callback
   const handleSegmentEnd = useCallback(async (endedSegmentIndex: number) => {
     if (!podcast?.segments) return;
-    
+
     // Only handle if this is the current segment that ended
     if (endedSegmentIndex !== currentSegmentIndex) return;
-    
+
     const nextIndex = currentSegmentIndex + 1;
 
     if (nextIndex >= podcast.segments.length) {
@@ -218,13 +267,11 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
 
     // Seamlessly switch to preloaded next segment
     if (nextAudioRef.current && nextAudioRef.current.segmentIndex === nextIndex) {
-      // Swap buffers
       currentAudioRef.current = nextAudioRef.current;
       nextAudioRef.current = null;
       segmentStartTimeRef.current = getSegmentStartTime(nextIndex);
       setCurrentSegmentIndex(nextIndex);
 
-      // Play immediately (listener already attached via createAudioBuffer)
       currentAudioRef.current.audio.play().catch(console.error);
 
       // Preload the following segment
@@ -314,6 +361,10 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
         nextAudioRef.current.audio.pause();
         nextAudioRef.current.audio.src = '';
       }
+      if (resumeAudioRef.current) {
+        resumeAudioRef.current.pause();
+        resumeAudioRef.current.src = '';
+      }
       preloadedSegmentsRef.current.forEach((url) => URL.revokeObjectURL(url));
       preloadedSegmentsRef.current.clear();
     };
@@ -327,7 +378,6 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
 
   const handlePlayPause = () => {
     if (!podcast && !podcastId) {
-      // Fallback for demo mode without real podcast
       setIsPlaying(!isPlaying);
       return;
     }
@@ -335,7 +385,6 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   };
 
   const handleSkipBack = () => {
-    // Skip to previous segment or rewind within current
     const currentAudio = currentAudioRef.current?.audio;
     if (currentAudio && currentAudio.currentTime > 3) {
       currentAudio.currentTime = 0;
@@ -345,7 +394,6 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
   };
 
   const handleSkipForward = () => {
-    // Skip to next segment
     if (podcast?.segments && currentSegmentIndex < podcast.segments.length - 1) {
       skipToSegment(currentSegmentIndex + 1);
     }
@@ -356,34 +404,28 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     if (!podcast?.segments || targetIndex < 0 || targetIndex >= podcast.segments.length) return;
 
     const wasPlaying = isPlaying;
-    
-    // Pause current audio
+
     if (currentAudioRef.current) {
       currentAudioRef.current.audio.pause();
     }
 
-    // Check if target is the preloaded next segment
     if (nextAudioRef.current && nextAudioRef.current.segmentIndex === targetIndex) {
       currentAudioRef.current = nextAudioRef.current;
       nextAudioRef.current = null;
     } else {
-      // Load the target segment
       const blobUrl = await fetchSegmentAudio(targetIndex);
       if (blobUrl) {
         currentAudioRef.current = createAudioBuffer(targetIndex, blobUrl);
       }
     }
 
-    // Update state
     segmentStartTimeRef.current = getSegmentStartTime(targetIndex);
     setCurrentSegmentIndex(targetIndex);
 
-    // Start playing if was playing (listener already attached via createAudioBuffer)
     if (wasPlaying && currentAudioRef.current) {
       currentAudioRef.current.audio.play().catch(console.error);
     }
 
-    // Preload next segment
     const nextIndex = targetIndex + 1;
     if (nextIndex < podcast.segments.length) {
       const nextBlobUrl = await fetchSegmentAudio(nextIndex);
@@ -400,7 +442,6 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     const clickPosition = (e.clientX - rect.left) / rect.width;
     const targetTime = clickPosition * totalDuration;
 
-    // Find which segment this time falls into
     let cumulativeTime = 0;
     for (let i = 0; i < podcast.segments.length; i++) {
       const segmentDuration = getSegmentDuration(i);
@@ -408,15 +449,12 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
         const positionInSegment = targetTime - cumulativeTime;
 
         if (i === currentSegmentIndex) {
-          // Same segment, just seek
           const currentAudio = currentAudioRef.current?.audio;
           if (currentAudio) {
             currentAudio.currentTime = positionInSegment;
           }
         } else {
-          // Different segment, skip to it then seek
           await skipToSegment(i);
-          // Wait for audio to be ready, then seek
           setTimeout(() => {
             const currentAudio = currentAudioRef.current?.audio;
             if (currentAudio) {
@@ -430,6 +468,8 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     }
   };
 
+  // --- Q&A Flow ---
+
   const handleRaiseHand = () => {
     setIsPlaying(false);
     setShowHandAnimation(true);
@@ -440,15 +480,121 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
     setShowQuestionModal(true);
   };
 
-  const handleAskQuestion = (question: string) => {
-    setShowQuestionModal(false);
-    // The question is answered directly in the playback flow,
-    // so we don't show an additional "answer" popup screen.
-    setIsPlaying(true);
+  const handleAskQuestion = async (question: string, audioBlob?: Blob) => {
+    if (!sessionId || !token) {
+      console.error('No session or token available');
+      setShowQuestionModal(false);
+      setIsPlaying(true);
+      return;
+    }
+
+    setIsSubmittingQuestion(true);
+
+    try {
+      let response: AskResponse;
+
+      if (audioBlob) {
+        // Voice question
+        const voiceResponse: ProcessVoiceResponse = await askVoiceQuestion(sessionId, audioBlob, token);
+
+        if (voiceResponse.is_continue_signal && voiceResponse.resume) {
+          // User said "continue" or similar - resume podcast
+          setShowQuestionModal(false);
+          await handleResumeAfterQA(voiceResponse.resume.resume_audio_url);
+          return;
+        }
+
+        if (voiceResponse.exchange) {
+          response = voiceResponse.exchange;
+          setCurrentQuestion(voiceResponse.transcription || 'Voice question');
+        } else {
+          throw new Error('No answer received');
+        }
+      } else {
+        // Text question
+        response = await askTextQuestion(sessionId, question, token);
+        setCurrentQuestion(question);
+      }
+
+      setCurrentAnswer(response);
+      setShowQuestionModal(false);
+      setShowAnswerModal(true);
+
+    } catch (err) {
+      console.error('Failed to submit question:', err);
+      setShowQuestionModal(false);
+      setIsPlaying(true);
+    } finally {
+      setIsSubmittingQuestion(false);
+    }
   };
 
   const handleResumeFromQuestion = () => {
     setShowQuestionModal(false);
+    setIsPlaying(true);
+  };
+
+  const handleResumeFromAnswer = async () => {
+    if (!sessionId || !token) {
+      setShowAnswerModal(false);
+      setIsPlaying(true);
+      return;
+    }
+
+    setIsLoadingResume(true);
+
+    try {
+      const resumeResponse = await continueSession(sessionId, token);
+      setShowAnswerModal(false);
+      setCurrentAnswer(null);
+
+      // Play resume audio if available, then resume podcast
+      await handleResumeAfterQA(resumeResponse.resume_audio_url);
+
+    } catch (err) {
+      console.error('Failed to get resume line:', err);
+      setShowAnswerModal(false);
+      setIsPlaying(true);
+    } finally {
+      setIsLoadingResume(false);
+    }
+  };
+
+  const handleResumeAfterQA = async (resumeAudioUrl?: string | null) => {
+    if (resumeAudioUrl && token) {
+      try {
+        // Fetch resume audio with auth
+        const baseUrl = getApiBaseUrl();
+        const fullUrl = resumeAudioUrl.startsWith('http') ? resumeAudioUrl : `${baseUrl}${resumeAudioUrl}`;
+
+        const response = await fetch(fullUrl, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+
+          resumeAudioRef.current = new Audio(blobUrl);
+          resumeAudioRef.current.onended = () => {
+            URL.revokeObjectURL(blobUrl);
+            setIsPlaying(true);
+          };
+          resumeAudioRef.current.onerror = () => {
+            URL.revokeObjectURL(blobUrl);
+            setIsPlaying(true);
+          };
+          resumeAudioRef.current.play().catch(() => {
+            setIsPlaying(true);
+          });
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to play resume audio:', err);
+      }
+    }
+
+    // No resume audio or failed to play - just resume
     setIsPlaying(true);
   };
 
@@ -499,7 +645,7 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
               </div>
             </div>
 
-            {/* Back Button - Top Left over album art */}
+            {/* Back Button */}
             <button
               onClick={onBackToLanding}
               className="absolute top-4 left-4 p-3 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm transition-all group"
@@ -508,7 +654,7 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
               <ArrowLeft className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
             </button>
 
-            {/* More Options Button - Top Right over album art */}
+            {/* More Options Button */}
             <button
               className="absolute top-4 right-4 p-3 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm transition-all group"
               aria-label="More options"
@@ -529,7 +675,7 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
 
           {/* Progress Bar */}
           <div className="mb-6 px-4">
-            <div 
+            <div
               onClick={handleProgressClick}
               className="h-1 bg-gray-600 rounded-full cursor-pointer mb-2 group"
             >
@@ -600,16 +746,17 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-[480px] px-6">
             <button
               onClick={handleRaiseHand}
-              className="w-full text-white py-4 px-6 rounded-full font-bold text-base shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2"
+              disabled={!sessionId}
+              className="w-full text-white py-4 px-6 rounded-full font-bold text-base shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
               style={{ backgroundColor: '#F59E0B' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#D97706'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#F59E0B'}
+              onMouseEnter={(e) => sessionId && (e.currentTarget.style.backgroundColor = '#D97706')}
+              onMouseLeave={(e) => sessionId && (e.currentTarget.style.backgroundColor = '#F59E0B')}
             >
               <Hand className="w-5 h-5" />
               Raise Hand
             </button>
             <p className="text-center text-xs text-gray-400 mt-2">
-              Ask questions anytime while listening
+              {sessionId ? 'Ask questions anytime while listening' : 'Loading Q&A session...'}
             </p>
           </div>
         </div>
@@ -620,12 +767,24 @@ export function PlayerScreen({ topic, podcastId, token, onBackToLanding }: Playe
         <HandRaiseAnimation onComplete={handleAnimationComplete} />
       )}
 
-      {/* Modals */}
+      {/* Question Modal */}
       {showQuestionModal && (
         <QuestionModal
           onAsk={handleAskQuestion}
           onCancel={handleResumeFromQuestion}
           autoStartRecording={true}
+          isSubmitting={isSubmittingQuestion}
+        />
+      )}
+
+      {/* Answer Modal */}
+      {showAnswerModal && currentAnswer && token && (
+        <AnswerModal
+          question={currentQuestion}
+          answer={currentAnswer}
+          token={token}
+          onResume={handleResumeFromAnswer}
+          isLoadingResume={isLoadingResume}
         />
       )}
     </>
