@@ -1,6 +1,6 @@
 """
 Podcast Service - Orchestrates podcast generation pipeline
-Merged: Uses Gemini Files API with PDF links + Segment system from main
+Uses Gemini Files API with paper_ids + Segment system
 """
 
 from __future__ import annotations
@@ -16,11 +16,10 @@ from app.config import get_settings
 from app.services.supabase_service import supabase_service
 from app.services.gemini_service import gemini_service
 from app.services.elevenlabs_service import elevenlabs_service
-from app.services.arxiv_service import arxiv_service
 
 
 class PodcastService:
-    """Orchestrates podcast generation pipeline using PDF links."""
+    """Orchestrates podcast generation pipeline using paper IDs."""
 
     def __init__(self):
         settings = get_settings()
@@ -73,24 +72,30 @@ class PodcastService:
 
     async def create_podcast(
         self,
-        pdf_links: List[str],
+        paper_ids: List[str],
         topic: str,
         difficulty_level: str,
         user_id: str
     ) -> dict:
-        """Create a new podcast record and start generation."""
-        # Auto-ingest papers from PDF links and get their UUIDs
-        paper_ids = await arxiv_service.auto_ingest_from_pdf_links(pdf_links, user_id)
-        
-        # Store pdf_links, topic, and difficulty_level in script_json 
+        """Create a new podcast record from ingested paper IDs."""
+        # Validate that papers exist and get their pdf_urls
+        papers = await supabase_service.select("papers")
+        paper_map = {p["id"]: p for p in papers if p["id"] in paper_ids}
+
+        # Check all paper_ids are valid
+        missing_ids = [pid for pid in paper_ids if pid not in paper_map]
+        if missing_ids:
+            raise ValueError(f"Papers not found: {missing_ids}")
+
+        # Store paper_ids, topic, and difficulty_level in script_json
         # for easy retrieval during generation
         initial_config = {
-            "pdf_links": pdf_links,
+            "paper_ids": paper_ids,
             "topic": topic,
             "difficulty_level": difficulty_level,
             "status": "config"
         }
-        
+
         # Create podcast record with pending status
         podcast_data = {
             "title": f"Podcast: {topic}",
@@ -98,7 +103,7 @@ class PodcastService:
             "status": "pending",
             "user_id": user_id,
             "script_json": initial_config,
-            "paper_ids": paper_ids  # Now populated with actual paper UUIDs
+            "paper_ids": paper_ids
         }
 
         podcast = await supabase_service.insert("podcasts", podcast_data)
@@ -123,10 +128,21 @@ class PodcastService:
                 raise ValueError("Podcast not found")
 
             podcast = podcasts[0]
-            # Get pdf_links and topic from script_json (initial config)
+            # Get paper_ids and topic from script_json (initial config)
             config = podcast.get("script_json", {})
-            pdf_links = config.get("pdf_links", [])
+            paper_ids = podcast.get("paper_ids", config.get("paper_ids", []))
             topic = config.get("topic", podcast.get("summary", "Research Paper"))
+
+            # Look up pdf_urls from papers table
+            papers = await supabase_service.select("papers")
+            pdf_links = []
+            for paper_id in paper_ids:
+                paper = next((p for p in papers if p["id"] == paper_id), None)
+                if paper and paper.get("pdf_url"):
+                    pdf_links.append(paper["pdf_url"])
+
+            if not pdf_links:
+                raise ValueError("No valid PDF URLs found for the provided papers")
 
             # Step 1: Download and upload PDFs to Gemini Files API
             uploaded_files = self.download_and_upload_pdfs(pdf_links)

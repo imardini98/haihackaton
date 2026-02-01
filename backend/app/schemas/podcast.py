@@ -1,6 +1,6 @@
 """
 Pydantic schemas for podcast generation and segments
-Merged: Uses pdf_links instead of paper_ids + Segment system from main
+Uses paper_ids (ingested papers) + Segment system
 """
 
 from __future__ import annotations
@@ -9,16 +9,16 @@ from typing import Optional, List
 
 
 class PodcastGenerateRequest(BaseModel):
-    """Request schema for podcast generation from PDF links"""
-    pdf_links: List[str] = Field(
-        ..., 
-        description="List of arXiv PDF URLs to synthesize", 
-        min_length=1, 
+    """Request schema for podcast generation from ingested paper IDs"""
+    paper_ids: List[str] = Field(
+        ...,
+        description="List of ingested paper UUIDs to synthesize",
+        min_length=1,
         max_length=10
     )
     topic: str = Field(..., description="Topic/context for the podcast")
     difficulty_level: str = Field(
-        default="intermediate", 
+        default="intermediate",
         description="Difficulty level: beginner, intermediate, advanced"
     )
 
@@ -47,7 +47,7 @@ class PodcastResponse(BaseModel):
     title: str
     summary: Optional[str] = None
     topic: Optional[str] = None
-    pdf_links: List[str] = []
+    paper_ids: List[str] = []
     status: str
     total_duration_seconds: Optional[int] = None
     error_message: Optional[str] = None

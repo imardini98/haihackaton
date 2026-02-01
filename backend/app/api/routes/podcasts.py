@@ -1,6 +1,6 @@
 """
 Podcast API Routes
-Merged: Uses pdf_links with Gemini Files API + Segment system from main
+Uses paper_ids with Gemini Files API + Segment system
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _format_podcast_response(podcast: dict, include_segments: bool = False) -> P
         title=podcast["title"],
         summary=podcast.get("summary"),
         topic=podcast.get("topic"),
-        pdf_links=podcast.get("pdf_links", []),
+        paper_ids=podcast.get("paper_ids", []),
         status=podcast["status"],
         total_duration_seconds=podcast.get("total_duration_seconds"),
         error_message=podcast.get("error_message"),
@@ -72,18 +72,18 @@ async def generate_podcast(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Start podcast generation from arXiv PDF links.
-    
-    - **pdf_links**: List of arXiv PDF URLs to synthesize (1-10 papers)
+    Start podcast generation from ingested paper IDs.
+
+    - **paper_ids**: List of ingested paper UUIDs (1-10 papers)
     - **topic**: Topic/context for the podcast
     - **difficulty_level**: beginner, intermediate, or advanced
-    
+
     Returns immediately, generation happens in background.
     Use GET /{podcast_id}/status to poll for completion.
     """
     # Create podcast record
     podcast = await podcast_service.create_podcast(
-        pdf_links=request.pdf_links,
+        paper_ids=request.paper_ids,
         topic=request.topic,
         difficulty_level=request.difficulty_level,
         user_id=current_user.id

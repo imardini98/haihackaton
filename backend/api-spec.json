@@ -470,7 +470,7 @@
                     "podcasts"
                 ],
                 "summary": "Generate Podcast",
-                "description": "Start podcast generation from papers. Returns immediately, generation happens in background.",
+                "description": "Start podcast generation from ingested paper IDs. Papers must be ingested first via POST /papers/ingest. Returns immediately, generation happens in background. Use GET /{podcast_id}/status to poll for completion.",
                 "operationId": "generate_podcast_api_v1_podcasts_generate_post",
                 "requestBody": {
                     "content": {
@@ -1750,19 +1750,26 @@
                 "properties": {
                     "paper_ids": {
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "uuid"
                         },
                         "type": "array",
-                        "title": "Paper Ids"
+                        "title": "Paper Ids",
+                        "description": "List of ingested paper UUIDs to synthesize into a podcast. Papers must be ingested first via POST /papers/ingest.",
+                        "minItems": 1,
+                        "maxItems": 10
                     },
                     "topic": {
                         "type": "string",
-                        "title": "Topic"
+                        "title": "Topic",
+                        "description": "Topic/context for the podcast. This will guide the narrative focus."
                     },
                     "difficulty_level": {
                         "type": "string",
                         "title": "Difficulty Level",
-                        "default": "intermediate"
+                        "description": "Target audience difficulty level: beginner, intermediate, or advanced.",
+                        "default": "intermediate",
+                        "enum": ["beginner", "intermediate", "advanced"]
                     }
                 },
                 "type": "object",
@@ -1797,11 +1804,14 @@
                 "properties": {
                     "id": {
                         "type": "string",
-                        "title": "Id"
+                        "format": "uuid",
+                        "title": "Id",
+                        "description": "Unique podcast identifier"
                     },
                     "title": {
                         "type": "string",
-                        "title": "Title"
+                        "title": "Title",
+                        "description": "Generated podcast title"
                     },
                     "summary": {
                         "anyOf": [
@@ -1812,7 +1822,8 @@
                                 "type": "null"
                             }
                         ],
-                        "title": "Summary"
+                        "title": "Summary",
+                        "description": "Generated podcast summary"
                     },
                     "topic": {
                         "anyOf": [
@@ -1823,14 +1834,17 @@
                                 "type": "null"
                             }
                         ],
-                        "title": "Topic"
+                        "title": "Topic",
+                        "description": "Original topic provided for generation"
                     },
                     "paper_ids": {
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "uuid"
                         },
                         "type": "array",
-                        "title": "Paper Ids"
+                        "title": "Paper Ids",
+                        "description": "List of source paper UUIDs used to generate this podcast"
                     },
                     "status": {
                         "type": "string",
