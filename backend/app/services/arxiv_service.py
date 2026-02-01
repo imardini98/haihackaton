@@ -615,6 +615,86 @@ Output JSON: {{"top_papers": [{{"index": 1, "relevance_score": 95, "relevance_re
                 'message': str(error)
             }
 
+    @staticmethod
+    def extract_arxiv_id_from_url(pdf_url: str) -> Optional[str]:
+        """
+        Extract arXiv ID from a PDF URL.
+        
+        Examples:
+            https://arxiv.org/pdf/2301.07041.pdf -> 2301.07041
+            http://arxiv.org/pdf/2512.13724v1 -> 2512.13724v1
+            https://export.arxiv.org/pdf/2301.07041 -> 2301.07041
+        """
+        import re
+        # Match arXiv ID pattern at the end of URL
+        # Format: YYMM.NNNNN or YYMM.NNNNNvN
+        pattern = r'(\d{4}\.\d{4,5}(?:v\d+)?)'
+        match = re.search(pattern, pdf_url)
+        if match:
+            return match.group(1)
+        return None
+
+    async def auto_ingest_from_pdf_links(self, pdf_links: List[str], user_id: str) -> List[str]:
+        """
+        Auto-ingest papers from PDF links and return their database UUIDs.
+        
+        Args:
+            pdf_links: List of arXiv PDF URLs
+            user_id: User ID to associate with ingested papers
+            
+        Returns:
+            List of paper UUIDs from the database
+        """
+        # Import here to avoid circular imports
+        from app.services.supabase_service import supabase_service
+        
+        paper_ids = []
+        
+        for pdf_url in pdf_links:
+            arxiv_id = self.extract_arxiv_id_from_url(pdf_url)
+            if not arxiv_id:
+                logger.warning(f"Could not extract arXiv ID from URL: {pdf_url}")
+                continue
+            
+            # Check if paper already exists
+            existing = await supabase_service.select(
+                "papers",
+                filters={"arxiv_id": arxiv_id}
+            )
+            
+            if existing:
+                # Paper exists, use its ID
+                paper_ids.append(existing[0]["id"])
+                logger.info(f"Paper {arxiv_id} already exists with ID {existing[0]['id']}")
+            else:
+                # Fetch and ingest the paper
+                try:
+                    arxiv_paper = await self.get_by_id(arxiv_id)
+                    if arxiv_paper:
+                        paper_data = {
+                            "arxiv_id": arxiv_paper.arxiv_id,
+                            "title": arxiv_paper.title,
+                            "authors": arxiv_paper.authors,
+                            "abstract": arxiv_paper.abstract,
+                            "content": arxiv_paper.abstract,  # Use abstract as content for now
+                            "pdf_url": arxiv_paper.pdf_url,
+                            "published_date": arxiv_paper.published_date,
+                            "categories": arxiv_paper.categories,
+                            "user_id": user_id
+                        }
+                        saved = await supabase_service.insert("papers", paper_data)
+                        if saved:
+                            paper_ids.append(saved["id"])
+                            logger.info(f"Auto-ingested paper {arxiv_id} with ID {saved['id']}")
+                        else:
+                            logger.error(f"Failed to save paper {arxiv_id}")
+                    else:
+                        logger.warning(f"Could not fetch paper {arxiv_id} from arXiv")
+                except Exception as e:
+                    logger.error(f"Error ingesting paper {arxiv_id}: {e}")
+        
+        return paper_ids
+
 
 # Create singleton instance
 arxiv_service = ArxivSemanticSearchService()

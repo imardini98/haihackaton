@@ -68,32 +68,75 @@ class GeminiService:
         # Build content with all PDFs + prompt
         contents = uploaded_files + [prompt]
 
-        # Generate using the client (supports multimodal content)
+        # Define JSON schema for structured output
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "metadata": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "summary": {"type": "string"},
+                        "total_segments": {"type": "integer"},
+                        "difficulty_level": {"type": "string"},
+                        "papers_covered": {"type": "integer"}
+                    },
+                    "required": ["title", "summary", "total_segments"]
+                },
+                "segments": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "topic_label": {"type": "string"},
+                            "key_terms": {
+                                "type": "array",
+                                "items": {"type": "string"}
+                            },
+                            "difficulty_level": {"type": "string"},
+                            "dialogue": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "speaker": {"type": "string"},
+                                        "voice_id": {"type": "string"},
+                                        "text": {"type": "string"}
+                                    },
+                                    "required": ["speaker", "voice_id", "text"]
+                                }
+                            },
+                            "transition_to_question": {"type": "string"},
+                            "resume_phrase": {"type": "string"}
+                        },
+                        "required": ["id", "topic_label", "dialogue"]
+                    }
+                }
+            },
+            "required": ["metadata", "segments"]
+        }
+
+        # Generate using structured JSON output (same as arxiv_service)
         response = self.client.models.generate_content(
             model=GEMINI_MODEL,
-            contents=contents
+            contents=contents,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": response_schema
+            }
         )
 
-        # Extract text from response
+        # Extract and parse JSON from response
         text = ""
         for part in response.candidates[0].content.parts:
             if hasattr(part, 'text'):
                 text += part.text
 
-        # Parse JSON from the response
         try:
-            if "```json" in text:
-                json_start = text.find("```json") + 7
-                json_end = text.find("```", json_start)
-                text = text[json_start:json_end].strip()
-            elif "```" in text:
-                json_start = text.find("```") + 3
-                json_end = text.find("```", json_start)
-                text = text[json_start:json_end].strip()
-
             return json.loads(text)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse Gemini response as JSON: {e}\nResponse: {text[:500]}")
+            raise ValueError(f"Failed to parse Gemini response as JSON: {e}\nResponse: {text[:1000]}")
 
     def _build_pdf_podcast_prompt(
         self,

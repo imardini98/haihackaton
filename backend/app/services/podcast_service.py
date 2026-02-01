@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.services.supabase_service import supabase_service
 from app.services.gemini_service import gemini_service
 from app.services.elevenlabs_service import elevenlabs_service
+from app.services.arxiv_service import arxiv_service
 
 
 class PodcastService:
@@ -78,8 +79,11 @@ class PodcastService:
         user_id: str
     ) -> dict:
         """Create a new podcast record and start generation."""
+        # Auto-ingest papers from PDF links and get their UUIDs
+        paper_ids = await arxiv_service.auto_ingest_from_pdf_links(pdf_links, user_id)
+        
         # Store pdf_links, topic, and difficulty_level in script_json 
-        # since those columns may not exist in the database
+        # for easy retrieval during generation
         initial_config = {
             "pdf_links": pdf_links,
             "topic": topic,
@@ -94,7 +98,7 @@ class PodcastService:
             "status": "pending",
             "user_id": user_id,
             "script_json": initial_config,
-            "paper_ids": []  # Empty array for required field
+            "paper_ids": paper_ids  # Now populated with actual paper UUIDs
         }
 
         podcast = await supabase_service.insert("podcasts", podcast_data)
