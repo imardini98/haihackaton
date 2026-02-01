@@ -78,13 +78,23 @@ class PodcastService:
         user_id: str
     ) -> dict:
         """Create a new podcast record and start generation."""
-        # Create podcast record with pending status
-        podcast_data = {
+        # Store pdf_links, topic, and difficulty_level in script_json 
+        # since those columns may not exist in the database
+        initial_config = {
             "pdf_links": pdf_links,
             "topic": topic,
+            "difficulty_level": difficulty_level,
+            "status": "config"
+        }
+        
+        # Create podcast record with pending status
+        podcast_data = {
             "title": f"Podcast: {topic}",
+            "summary": topic,  # Use summary to store topic temporarily
             "status": "pending",
-            "user_id": user_id
+            "user_id": user_id,
+            "script_json": initial_config,
+            "paper_ids": []  # Empty array for required field
         }
 
         podcast = await supabase_service.insert("podcasts", podcast_data)
@@ -109,8 +119,10 @@ class PodcastService:
                 raise ValueError("Podcast not found")
 
             podcast = podcasts[0]
-            pdf_links = podcast["pdf_links"]
-            topic = podcast["topic"]
+            # Get pdf_links and topic from script_json (initial config)
+            config = podcast.get("script_json", {})
+            pdf_links = config.get("pdf_links", [])
+            topic = config.get("topic", podcast.get("summary", "Research Paper"))
 
             # Step 1: Download and upload PDFs to Gemini Files API
             uploaded_files = self.download_and_upload_pdfs(pdf_links)
@@ -119,7 +131,7 @@ class PodcastService:
             script = await gemini_service.generate_podcast_script_from_pdfs(
                 uploaded_files=uploaded_files,
                 topic=topic,
-                difficulty_level=podcast.get("difficulty_level", "intermediate")
+                difficulty_level=config.get("difficulty_level", "intermediate")
             )
 
             # Update podcast with script
