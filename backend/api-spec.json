@@ -251,14 +251,14 @@
                 "tags": [
                     "papers"
                 ],
-                "summary": "Search Arxiv",
-                "description": "Search ArXiv for papers. No auth required.",
+                "summary": "Semantic Search ArXiv",
+                "description": "Semantic search for arXiv papers using Gemini AI for query refinement and ranking. Returns a ranked list of relevant papers with relevance scores, key contributions, and PDF links.",
                 "operationId": "search_arxiv_api_v1_papers_search_post",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/PaperSearchRequest"
+                                "$ref": "#/components/schemas/ArxivSearchRequest"
                             }
                         }
                     },
@@ -270,17 +270,23 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "items": {
-                                        "$ref": "#/components/schemas/ArxivPaperResponse"
-                                    },
-                                    "type": "array",
-                                    "title": "Response Search Arxiv Api V1 Papers Search Post"
+                                    "$ref": "#/components/schemas/ArxivSearchResponse"
                                 }
                             }
                         }
                     },
                     "422": {
                         "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Search Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1051,6 +1057,230 @@
     },
     "components": {
         "schemas": {
+            "ArxivSearchRequest": {
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "title": "Query",
+                        "description": "The search query for arXiv papers"
+                    },
+                    "context": {
+                        "type": "string",
+                        "title": "Context",
+                        "description": "Additional context to refine the search",
+                        "default": ""
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "title": "Max Results",
+                        "description": "Maximum number of papers to fetch from arXiv",
+                        "default": 20,
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "top_n": {
+                        "type": "integer",
+                        "title": "Top N",
+                        "description": "Number of top results to return",
+                        "default": 5,
+                        "minimum": 1,
+                        "maximum": 20
+                    },
+                    "max_pdf_pages": {
+                        "type": "integer",
+                        "title": "Max PDF Pages",
+                        "description": "Maximum PDF pages allowed for filtering",
+                        "default": 50,
+                        "minimum": 1,
+                        "maximum": 500
+                    }
+                },
+                "type": "object",
+                "required": ["query"],
+                "title": "ArxivSearchRequest"
+            },
+            "ArxivSearchResponse": {
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "title": "Query"
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "title": "Timestamp"
+                    },
+                    "total_papers_found": {
+                        "type": "integer",
+                        "title": "Total Papers Found"
+                    },
+                    "papers_excluded_by_page_limit": {
+                        "type": "integer",
+                        "title": "Papers Excluded By Page Limit"
+                    },
+                    "papers_after_filtering": {
+                        "type": "integer",
+                        "title": "Papers After Filtering"
+                    },
+                    "top_papers_count": {
+                        "type": "integer",
+                        "title": "Top Papers Count"
+                    },
+                    "refined_query": {
+                        "$ref": "#/components/schemas/RefinedQuery"
+                    },
+                    "overall_analysis": {
+                        "type": "string",
+                        "title": "Overall Analysis"
+                    },
+                    "top_papers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PaperSummary"
+                        },
+                        "title": "Top Papers"
+                    },
+                    "top_5_links": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Top 5 Links"
+                    },
+                    "excluded_papers": {
+                        "anyOf": [
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                }
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Excluded Papers"
+                    }
+                },
+                "type": "object",
+                "required": ["query", "timestamp", "total_papers_found", "papers_excluded_by_page_limit", "papers_after_filtering", "top_papers_count", "refined_query", "overall_analysis", "top_papers", "top_5_links"],
+                "title": "ArxivSearchResponse"
+            },
+            "RefinedQuery": {
+                "properties": {
+                    "refined_query": {
+                        "type": "string",
+                        "title": "Refined Query"
+                    },
+                    "key_concepts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Key Concepts"
+                    },
+                    "search_focus": {
+                        "type": "string",
+                        "title": "Search Focus"
+                    },
+                    "additional_filters": {
+                        "anyOf": [
+                            {
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Additional Filters"
+                    }
+                },
+                "type": "object",
+                "required": ["refined_query", "key_concepts", "search_focus"],
+                "title": "RefinedQuery"
+            },
+            "PaperSummary": {
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "title": "Index"
+                    },
+                    "title": {
+                        "type": "string",
+                        "title": "Title"
+                    },
+                    "authors": {
+                        "type": "string",
+                        "title": "Authors"
+                    },
+                    "arxiv_id": {
+                        "type": "string",
+                        "title": "Arxiv Id"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "title": "Summary"
+                    },
+                    "published": {
+                        "type": "string",
+                        "title": "Published"
+                    },
+                    "updated": {
+                        "type": "string",
+                        "title": "Updated"
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "title": "Categories"
+                    },
+                    "primary_category": {
+                        "type": "string",
+                        "title": "Primary Category"
+                    },
+                    "pdf_link": {
+                        "type": "string",
+                        "title": "PDF Link"
+                    },
+                    "abstract_link": {
+                        "type": "string",
+                        "title": "Abstract Link"
+                    },
+                    "page_count": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "null"}
+                        ],
+                        "title": "Page Count"
+                    },
+                    "relevance_score": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "null"}
+                        ],
+                        "title": "Relevance Score"
+                    },
+                    "relevance_reason": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "title": "Relevance Reason"
+                    },
+                    "key_contributions": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "title": "Key Contributions"
+                    }
+                },
+                "type": "object",
+                "required": ["index", "title", "authors", "arxiv_id", "summary", "published", "updated", "categories", "primary_category", "pdf_link", "abstract_link"],
+                "title": "PaperSummary"
+            },
             "ArxivPaperResponse": {
                 "properties": {
                     "arxiv_id": {
