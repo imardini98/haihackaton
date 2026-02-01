@@ -4,11 +4,27 @@ import { ResearchProgressScreen } from './components/ResearchProgressScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { PlayerScreen } from './components/PlayerScreen';
 import { LoginScreen } from './components/LoginScreen';
+import type { AuthResponse } from './api/auth';
 
 type AppState = 'landing' | 'research' | 'loading' | 'player';
 type AuthState = 'unknown' | 'authenticated' | 'unauthenticated';
 
-const AUTH_STORAGE_KEY = 'podask.authenticated';
+const LEGACY_AUTH_STORAGE_KEY = 'podask.authenticated';
+const SESSION_STORAGE_KEY = 'podask.session';
+
+function getStoredSession(): AuthResponse | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthResponse> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.access_token !== 'string' || !parsed.access_token.trim()) return null;
+    if (typeof parsed.user_id !== 'string' || typeof parsed.email !== 'string') return null;
+    return parsed as AuthResponse;
+  } catch {
+    return null;
+  }
+}
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('landing');
@@ -17,8 +33,17 @@ export default function App() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-      setAuthState(stored === 'true' ? 'authenticated' : 'unauthenticated');
+      const session = getStoredSession();
+      if (session) {
+        setAuthState('authenticated');
+        return;
+      }
+
+      // Clear legacy storage (boolean auth) so we don't show "logged in"
+      // without having a real backend session token.
+      localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+      localStorage.removeItem('podask.email');
+      setAuthState('unauthenticated');
     } catch {
       setAuthState('unauthenticated');
     }
@@ -38,11 +63,9 @@ export default function App() {
     setTopic('');
   };
 
-  const handleLogin = ({ email }: { email: string }) => {
-    // Frontend-only: persist a boolean, ignore credentials for now.
+  const handleLogin = (session: AuthResponse) => {
     try {
-      localStorage.setItem(AUTH_STORAGE_KEY, 'true');
-      localStorage.setItem('podask.email', email);
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
     } catch {
       // ignore
     }
@@ -51,7 +74,8 @@ export default function App() {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
       localStorage.removeItem('podask.email');
     } catch {
       // ignore

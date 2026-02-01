@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import logo from '../assets/433dc299e6c56f79156becafd6df63c758f567fc.png';
+import { ApiError } from '../api/http';
+import { signIn, type AuthResponse } from '../api/auth';
 
 interface LoginScreenProps {
-  onLogin: (payload: { email: string }) => void;
+  onLogin: (session: AuthResponse) => void;
 }
 
 const ACCENT = '#F59E0B'; // matches the app's amber accent used elsewhere
@@ -15,22 +17,39 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit = useMemo(() => {
     return email.trim().length > 0 && password.trim().length > 0;
   }, [email, password]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!email.trim() || !password.trim()) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
       setError('Please enter an email and password.');
       return;
     }
 
-    // Frontend-only: accept any non-empty credentials for now.
-    onLogin({ email: email.trim() });
+    try {
+      setIsSubmitting(true);
+      const session = await signIn({ email: trimmedEmail, password: trimmedPassword });
+      onLogin(session);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setError(e.message || 'Sign in failed.');
+      } else if (e instanceof Error) {
+        setError(e.message || 'Sign in failed.');
+      } else {
+        setError('Sign in failed.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -53,6 +72,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
             placeholder="Email"
+            disabled={isSubmitting}
             className="w-full px-6 py-4 rounded-xl focus:outline-none transition-colors text-white placeholder:text-gray-400"
             style={{
               backgroundColor: INPUT_BG,
@@ -67,6 +87,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             placeholder="Password"
+            disabled={isSubmitting}
             className="w-full px-6 py-4 rounded-xl focus:outline-none transition-colors text-white placeholder:text-gray-400"
             style={{
               backgroundColor: INPUT_BG_SOFT,
@@ -102,7 +123,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             className="w-full py-4 px-8 rounded-xl text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg"
             style={{ backgroundColor: ACCENT }}
             onMouseEnter={(e) => {
@@ -112,7 +133,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = ACCENT;
             }}
           >
-            Sign in
+            {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
 
           <div className="text-center pt-2">
