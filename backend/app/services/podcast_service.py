@@ -78,9 +78,10 @@ class PodcastService:
             # Create segments and generate audio
             segments = script.get("segments", [])
             total_duration = 0
+            user_id = podcast.get("user_id")
 
             for segment_data in segments:
-                segment = await self._create_segment(podcast_id, segment_data)
+                segment = await self._create_segment(podcast_id, segment_data, user_id)
                 if segment and segment.get("duration_seconds"):
                     total_duration += segment["duration_seconds"]
 
@@ -129,7 +130,12 @@ class PodcastService:
 
         return "\n".join(contents)
 
-    async def _create_segment(self, podcast_id: str, segment_data: dict) -> Optional[dict]:
+    async def _create_segment(
+        self, 
+        podcast_id: str, 
+        segment_data: dict, 
+        user_id: Optional[str] = None
+    ) -> Optional[dict]:
         """Create a segment and generate its audio."""
         dialogue = segment_data.get("dialogue", [])
 
@@ -139,7 +145,9 @@ class PodcastService:
         try:
             audio_url = await elevenlabs_service.generate_segment_audio(
                 dialogue=dialogue,
-                segment_id=segment_id
+                segment_id=segment_id,
+                user_id=user_id,
+                podcast_id=podcast_id
             )
         except Exception as e:
             print(f"Audio generation failed for segment: {e}")

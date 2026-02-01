@@ -20,10 +20,25 @@ class ElevenLabsService:
             self._client = ElevenLabs(api_key=settings.elevenlabs_api_key)
         return self._client
 
-    def _get_audio_path(self, filename: str) -> Path:
-        """Get full path for audio file."""
+    def _get_audio_path(
+        self, 
+        filename: str, 
+        user_id: Optional[str] = None, 
+        podcast_id: Optional[str] = None
+    ) -> Path:
+        """Get full path for audio file with user/podcast folder structure.
+        
+        Structure: audio_files/{user_id}/{podcast_id}/{filename}
+        """
         settings = get_settings()
         audio_dir = Path(settings.audio_storage_path)
+        
+        # Build path: audio_files/{user_id}/{podcast_id}/
+        if user_id:
+            audio_dir = audio_dir / user_id
+        if podcast_id:
+            audio_dir = audio_dir / podcast_id
+        
         audio_dir.mkdir(parents=True, exist_ok=True)
         return audio_dir / filename
 
@@ -32,10 +47,20 @@ class ElevenLabsService:
         text: str,
         voice_id: str,
         filename: Optional[str] = None,
-        model_id: Optional[str] = None
+        model_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        podcast_id: Optional[str] = None
     ) -> str:
         """
         Convert text to speech and save to file.
+        
+        Args:
+            text: Text to convert to speech
+            voice_id: ElevenLabs voice ID
+            filename: Output filename (auto-generated if not provided)
+            model_id: ElevenLabs model ID (uses config default if not provided)
+            user_id: User ID for folder structure
+            podcast_id: Podcast ID for folder structure
         
         Supports v3 audio tags in square brackets:
         - Breath & pauses: [inhales], [exhales], [short pause], [long pause]
@@ -50,7 +75,7 @@ class ElevenLabsService:
         if not filename:
             filename = f"{uuid.uuid4()}.mp3"
 
-        audio_path = self._get_audio_path(filename)
+        audio_path = self._get_audio_path(filename, user_id, podcast_id)
 
         # Use configured model or provided override
         settings = get_settings()
@@ -89,9 +114,18 @@ class ElevenLabsService:
     async def generate_segment_audio(
         self,
         dialogue: list[dict],
-        segment_id: str
+        segment_id: str,
+        user_id: Optional[str] = None,
+        podcast_id: Optional[str] = None
     ) -> str:
-        """Generate audio for a full segment dialogue."""
+        """Generate audio for a full segment dialogue.
+        
+        Args:
+            dialogue: List of dialogue lines with speaker and text
+            segment_id: Unique segment identifier
+            user_id: User ID for folder structure
+            podcast_id: Podcast ID for folder structure
+        """
         settings = get_settings()
 
         # Generate audio for each line and combine
@@ -111,7 +145,10 @@ class ElevenLabsService:
                 voice_id = settings.elevenlabs_expert_voice_id
 
             filename = f"{segment_id}_line_{i}.mp3"
-            audio_path = await self.text_to_speech(text, voice_id, filename)
+            audio_path = await self.text_to_speech(
+                text, voice_id, filename, 
+                user_id=user_id, podcast_id=podcast_id
+            )
             audio_files.append(audio_path)
 
         # For MVP, return the first audio file path
@@ -120,15 +157,33 @@ class ElevenLabsService:
             return audio_files[0]
         return ""
 
-    async def generate_host_audio(self, text: str, filename: Optional[str] = None) -> str:
+    async def generate_host_audio(
+        self, 
+        text: str, 
+        filename: Optional[str] = None,
+        user_id: Optional[str] = None,
+        podcast_id: Optional[str] = None
+    ) -> str:
         """Generate audio with HOST voice."""
         settings = get_settings()
-        return await self.text_to_speech(text, settings.elevenlabs_host_voice_id, filename)
+        return await self.text_to_speech(
+            text, settings.elevenlabs_host_voice_id, filename,
+            user_id=user_id, podcast_id=podcast_id
+        )
 
-    async def generate_expert_audio(self, text: str, filename: Optional[str] = None) -> str:
+    async def generate_expert_audio(
+        self, 
+        text: str, 
+        filename: Optional[str] = None,
+        user_id: Optional[str] = None,
+        podcast_id: Optional[str] = None
+    ) -> str:
         """Generate audio with EXPERT voice."""
         settings = get_settings()
-        return await self.text_to_speech(text, settings.elevenlabs_expert_voice_id, filename)
+        return await self.text_to_speech(
+            text, settings.elevenlabs_expert_voice_id, filename,
+            user_id=user_id, podcast_id=podcast_id
+        )
 
     async def speech_to_text(self, audio_path: str) -> str:
         """Transcribe audio to text using ElevenLabs."""

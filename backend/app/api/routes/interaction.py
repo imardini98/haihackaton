@@ -1,5 +1,6 @@
 from __future__ import annotations
 import uuid
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File
 from typing import Optional
 from datetime import datetime
@@ -118,16 +119,18 @@ async def ask_voice_question(
         )
     session = sessions[0]
 
-    # Save audio file temporarily
+    # Save audio file with user/podcast folder structure
     audio_filename = f"question_{session_id}_{uuid.uuid4()}.mp3"
-    audio_path = f"./audio_files/{audio_filename}"
+    audio_dir = Path(f"./audio_files/{current_user.id}/{session['podcast_id']}")
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    audio_path = audio_dir / audio_filename
 
     with open(audio_path, "wb") as f:
         content = await audio.read()
         f.write(content)
 
     # Transcribe audio
-    transcription = await elevenlabs_service.speech_to_text(audio_path)
+    transcription = await elevenlabs_service.speech_to_text(str(audio_path))
 
     # Check if it's a continue signal or a question
     if is_continue_signal(transcription):
@@ -296,15 +299,22 @@ async def _process_question(session: dict, question: str, current_user: dict) ->
     host_ack = exchange_data.get("host_acknowledgment", "Great question.")
     expert_answer = exchange_data.get("expert_answer", "Let me explain...")
 
-    # Generate audio for host and expert
+    # Generate audio for host and expert with user/podcast folder structure
     exchange_id = str(uuid.uuid4())
+    user_id = current_user.id
+    podcast_id = session["podcast_id"]
+    
     host_audio_url = await elevenlabs_service.generate_host_audio(
         host_ack,
-        f"qa_{exchange_id}_host.mp3"
+        f"qa_{exchange_id}_host.mp3",
+        user_id=user_id,
+        podcast_id=podcast_id
     )
     expert_audio_url = await elevenlabs_service.generate_expert_audio(
         expert_answer,
-        f"qa_{exchange_id}_expert.mp3"
+        f"qa_{exchange_id}_expert.mp3",
+        user_id=user_id,
+        podcast_id=podcast_id
     )
 
     # Save Q&A exchange to database
@@ -387,10 +397,12 @@ async def _process_continue(session: dict, user_signal: str, current_user: dict)
         )
         resume_line = resume_response.get("resume_line", {}).get("text", "Alright, let's continue.")
 
-    # Generate audio for resume line
+    # Generate audio for resume line with user/podcast folder structure
     resume_audio_url = await elevenlabs_service.generate_host_audio(
         resume_line,
-        f"resume_{session['id']}_{uuid.uuid4()}.mp3"
+        f"resume_{session['id']}_{uuid.uuid4()}.mp3",
+        user_id=current_user.id,
+        podcast_id=session["podcast_id"]
     )
 
     # Update session to playing and move to next segment
