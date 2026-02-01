@@ -1,16 +1,57 @@
 import { requestJson } from './http';
 
-// Types based on api-spec.json schemas
+// Types based on updated api-spec.json schemas
 
-export interface ArxivPaper {
-  arxiv_id: string;
-  title: string;
-  authors: string[];
-  abstract: string;
-  pdf_url: string;
-  published_date: string;
-  categories: string[];
+// --- Search Types (Semantic Search) ---
+
+export interface ArxivSearchRequest {
+  query: string;
+  context?: string;
+  max_results?: number; // default 20
+  top_n?: number; // default 5
+  max_pdf_pages?: number; // default 50
 }
+
+export interface RefinedQuery {
+  refined_query: string;
+  key_concepts: string[];
+  search_focus: string;
+  additional_filters?: Record<string, unknown> | null;
+}
+
+export interface PaperSummary {
+  index: number;
+  title: string;
+  authors: string; // Note: string, not array
+  arxiv_id: string;
+  summary: string;
+  published: string;
+  updated: string;
+  categories: string[];
+  primary_category: string;
+  pdf_link: string;
+  abstract_link: string;
+  page_count?: number | null;
+  relevance_score?: number | null;
+  relevance_reason?: string | null;
+  key_contributions?: string | null;
+}
+
+export interface ArxivSearchResponse {
+  query: string;
+  timestamp: string;
+  total_papers_found: number;
+  papers_excluded_by_page_limit: number;
+  papers_after_filtering: number;
+  top_papers_count: number;
+  refined_query: RefinedQuery;
+  overall_analysis: string;
+  top_papers: PaperSummary[];
+  top_5_links: string[];
+  excluded_papers?: Record<string, unknown>[] | null;
+}
+
+// --- Ingested Paper Types ---
 
 export interface Paper {
   id: string;
@@ -30,30 +71,34 @@ export interface PaperListResponse {
   total: number;
 }
 
-export interface PaperSearchRequest {
-  query: string;
-  max_results?: number;
-  sort_by?: string;
-}
-
 export interface PaperIngestRequest {
   arxiv_id: string;
 }
 
+// --- API Functions ---
+
 /**
- * Search ArXiv for papers. No auth required.
+ * Semantic search for ArXiv papers using Gemini AI. No auth required.
+ * Returns ranked papers with relevance scores and key contributions.
  */
 export async function searchPapers(
   query: string,
-  maxResults: number = 5
-): Promise<ArxivPaper[]> {
-  return requestJson<ArxivPaper[]>('/api/v1/papers/search', {
+  options: {
+    context?: string;
+    maxResults?: number;
+    topN?: number;
+    maxPdfPages?: number;
+  } = {}
+): Promise<ArxivSearchResponse> {
+  return requestJson<ArxivSearchResponse>('/api/v1/papers/search', {
     method: 'POST',
     body: JSON.stringify({
       query,
-      max_results: maxResults,
-      sort_by: 'submitted',
-    } satisfies PaperSearchRequest),
+      context: options.context || '',
+      max_results: 10,
+      top_n: options.topN ?? 5,
+      max_pdf_pages: options.maxPdfPages ?? 50,
+    } satisfies ArxivSearchRequest),
   });
 }
 

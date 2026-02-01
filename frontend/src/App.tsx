@@ -89,6 +89,7 @@ function getStoredSession(): AuthResponse | null {
 export default function App() {
   const [appState, setAppState] = useState<AppState>('landing');
   const [topic, setTopic] = useState('');
+  const [podcastId, setPodcastId] = useState<string | null>(null);
   const [authState, setAuthState] = useState<AuthState>('unknown');
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgotPassword' | 'resetPassword'>('login');
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
@@ -180,13 +181,15 @@ export default function App() {
     setAppState('research');
   };
 
-  const handleResearchComplete = () => {
+  const handleResearchComplete = (generatedPodcastId: string) => {
+    setPodcastId(generatedPodcastId);
     setAppState('player');
   };
-  
+
   const handleBackToLanding = () => {
     setAppState('landing');
     setTopic('');
+    setPodcastId(null);
   };
 
   const handleLogin = (session: AuthResponse) => {
@@ -256,13 +259,22 @@ export default function App() {
             <LandingScreen onGeneratePodcast={handleGeneratePodcast} />
           )}
           {appState === 'research' && (
-            <ResearchProgressScreen topic={topic} onComplete={handleResearchComplete} />
+            <ResearchProgressScreen
+              topic={topic}
+              token={getStoredSession()?.access_token || ''}
+              onComplete={handleResearchComplete}
+            />
           )}
           {appState === 'loading' && (
             <LoadingScreen />
           )}
           {appState === 'player' && (
-            <PlayerScreen topic={topic} onBackToLanding={handleBackToLanding} />
+            <PlayerScreen
+              topic={topic}
+              podcastId={podcastId}
+              token={getStoredSession()?.access_token || ''}
+              onBackToLanding={handleBackToLanding}
+            />
           )}
         </>
       )}

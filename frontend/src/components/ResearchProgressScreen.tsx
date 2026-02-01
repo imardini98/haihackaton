@@ -1,114 +1,229 @@
-import React, { useEffect, useState } from 'react';
-import { 
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import {
   FileText,
   Sparkles,
   List,
   BarChart3,
   Mic,
   CheckCircle,
-  Headphones
+  Headphones,
+  AlertCircle
 } from 'lucide-react';
+import { searchPapers, ingestPaper, type PaperSummary, type Paper } from '../api/papers';
+import { generatePodcast, pollPodcastStatus, type Podcast } from '../api/podcasts';
+import { ApiError } from '../api/http';
 
 interface ResearchProgressScreenProps {
   topic: string;
-  onComplete: () => void;
+  token: string;
+  onComplete: (podcastId: string) => void;
+  onError?: (error: string) => void;
 }
 
 interface PipelineStep {
   id: string;
   title: string;
   icon: React.ComponentType<{ className?: string }>;
-  duration: number; // in milliseconds
 }
 
 const pipelineSteps: PipelineStep[] = [
   {
     id: 'scanning',
-    title: 'Scanning the papers',
+    title: 'Searching for papers',
     icon: FileText,
-    duration: 3000,
   },
   {
     id: 'summarizing',
-    title: 'Summarizing the articles',
+    title: 'Analyzing relevance',
     icon: Sparkles,
-    duration: 3000,
   },
   {
     id: 'collecting',
-    title: 'Collecting the main points',
+    title: 'Ingesting papers',
     icon: List,
-    duration: 3000,
   },
   {
     id: 'structuring',
     title: 'Structuring the episode',
     icon: BarChart3,
-    duration: 3000,
   },
   {
     id: 'preparing',
-    title: 'Preparing the narration',
+    title: 'Generating audio',
     icon: Mic,
-    duration: 3000,
   },
   {
     id: 'checking',
     title: 'Checking for clarity',
     icon: CheckCircle,
-    duration: 2500,
   },
   {
     id: 'finalizing',
     title: 'Finalizing your podcast',
     icon: Headphones,
-    duration: 2500,
   },
 ];
 
-export function ResearchProgressScreen({ topic, onComplete }: ResearchProgressScreenProps) {
+export function ResearchProgressScreen({ topic, token, onComplete, onError }: ResearchProgressScreenProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const abortRef = useRef(false);
+  const hasStartedRef = useRef(false);
 
   const currentStep = pipelineSteps[currentStepIndex];
-  const totalDuration = pipelineSteps.reduce((sum, step) => sum + step.duration, 0);
+
+  const setStep = useCallback((index: number, progressValue?: number) => {
+    setCurrentStepIndex(index);
+    if (progressValue !== undefined) {
+      setProgress(progressValue);
+    }
+  }, []);
 
   useEffect(() => {
-    let stepTimer: number;
-    let progressInterval: number;
-    let elapsedTime = 0;
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
 
-    // Calculate elapsed time for all previous steps
-    for (let i = 0; i < currentStepIndex; i++) {
-      elapsedTime += pipelineSteps[i].duration;
-    }
+    const runPipeline = async () => {
+      try {
+        // Step 0: Searching for papers
+        setStep(0, 5);
+        setStatusMessage('Querying ArXiv...');
 
-    // Move to next step after current step duration
-    stepTimer = window.setTimeout(() => {
-      if (currentStepIndex < pipelineSteps.length - 1) {
-        setCurrentStepIndex((prev) => prev + 1);
-      } else {
-        // All steps complete
+        const searchResult = await searchPapers(topic, {
+          maxResults: 20,
+          topN: 5,
+          maxPdfPages: 50,
+        });
+
+        if (abortRef.current) return;
+
+        const topPapers = searchResult.top_papers;
+        if (!topPapers || topPapers.length === 0) {
+          throw new Error('No relevant papers found for this topic. Try a different search query.');
+        }
+
+        setStatusMessage(`Found ${searchResult.total_papers_found} papers, selected top ${topPapers.length}`);
+        setStep(1, 15);
+
+        // Step 1: Analyzing relevance (brief pause to show the step)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (abortRef.current) return;
+
+        // Step 2: Ingesting papers
+        setStep(2, 25);
+        const ingestedPapers: Paper[] = [];
+
+        for (let i = 0; i < topPapers.length; i++) {
+          if (abortRef.current) return;
+
+          const paper = topPapers[i];
+          setStatusMessage(`Ingesting paper ${i + 1}/${topPapers.length}: ${paper.title.slice(0, 50)}...`);
+
+          try {
+            const ingested = await ingestPaper(paper.arxiv_id, token);
+            ingestedPapers.push(ingested);
+          } catch (err) {
+            // Paper might already be ingested, continue with next
+            console.warn(`Failed to ingest paper ${paper.arxiv_id}:`, err);
+          }
+
+          setProgress(25 + ((i + 1) / topPapers.length) * 15);
+        }
+
+        if (abortRef.current) return;
+
+        if (ingestedPapers.length === 0) {
+          throw new Error('Failed to ingest any papers. Please try again.');
+        }
+
+        setStatusMessage(`Ingested ${ingestedPapers.length} papers`);
+
+        // Step 3: Structuring the episode (start podcast generation)
+        setStep(3, 45);
+        setStatusMessage('Starting podcast generation...');
+
+        const paperIds = ingestedPapers.map(p => p.id);
+        const podcast = await generatePodcast(paperIds, topic, token);
+
+        if (abortRef.current) return;
+
+        setStatusMessage(`Podcast created, generating content...`);
+
+        // Step 4-6: Poll for podcast status
+        setStep(4, 55);
+
+        await pollPodcastStatus(podcast.id, token, {
+          intervalMs: 3000,
+          maxAttempts: 100,
+          onStatusChange: (status) => {
+            if (abortRef.current) return;
+
+            switch (status.status) {
+              case 'pending':
+                setStep(4, 55);
+                setStatusMessage('Queued for generation...');
+                break;
+              case 'generating':
+                // Progress through steps 4-6 based on time
+                const currentProgress = progress;
+                if (currentProgress < 70) {
+                  setStep(4, Math.min(currentProgress + 5, 70));
+                  setStatusMessage('Generating audio narration...');
+                } else if (currentProgress < 85) {
+                  setStep(5, Math.min(currentProgress + 5, 85));
+                  setStatusMessage('Checking quality...');
+                } else {
+                  setStep(6, Math.min(currentProgress + 3, 95));
+                  setStatusMessage('Almost ready...');
+                }
+                break;
+              case 'ready':
+                setStep(6, 100);
+                setStatusMessage('Podcast ready!');
+                break;
+              case 'failed':
+                throw new Error(status.error_message || 'Podcast generation failed');
+            }
+          },
+        });
+
+        if (abortRef.current) return;
+
+        // Complete
+        setProgress(100);
+        setStatusMessage('Your podcast is ready!');
+
         setTimeout(() => {
-          onComplete();
+          if (!abortRef.current) {
+            onComplete(podcast.id);
+          }
         }, 500);
-      }
-    }, currentStep.duration);
 
-    // Smooth progress bar
-    progressInterval = window.setInterval(() => {
-      setProgress((prev) => {
-        const increment = (100 / totalDuration) * 50; // Update every 50ms
-        const newProgress = prev + increment;
-        return Math.min(newProgress, 100);
-      });
-    }, 50);
+      } catch (err) {
+        if (abortRef.current) return;
+
+        let message = 'An unexpected error occurred';
+        if (err instanceof ApiError) {
+          message = err.message;
+        } else if (err instanceof Error) {
+          message = err.message;
+        }
+
+        setError(message);
+        if (onError) {
+          onError(message);
+        }
+      }
+    };
+
+    runPipeline();
 
     return () => {
-      clearTimeout(stepTimer);
-      clearInterval(progressInterval);
+      abortRef.current = true;
     };
-  }, [currentStepIndex, currentStep.duration, totalDuration, onComplete]);
+  }, [topic, token, onComplete, onError, setStep]);
 
   const getAnimationClass = () => {
     switch (currentStep.id) {
@@ -373,25 +488,52 @@ export function ResearchProgressScreen({ topic, onComplete }: ResearchProgressSc
 
           {/* Step Title */}
           <h2 className="text-2xl font-semibold text-center text-white">
-            {currentStep.title}
+            {error ? 'Something went wrong' : currentStep.title}
           </h2>
+
+          {/* Status Message */}
+          {statusMessage && !error && (
+            <p className="text-sm text-blue-200 mt-3 text-center">
+              {statusMessage}
+            </p>
+          )}
         </div>
 
-        {/* Progress Bar */}
-        <div className="mt-8 space-y-2">
-          <div className="h-2 rounded-full overflow-hidden bg-white/10">
-            <div
-              className="h-full rounded-full transition-all duration-300 ease-out"
-              style={{ 
-                width: `${progress}%`,
-                background: 'linear-gradient(to right, #2188FF, #0560D4)'
-              }}
-            />
+        {/* Error Display */}
+        {error && (
+          <div className="mt-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-white text-sm">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-3 text-sm text-blue-300 hover:text-blue-200 underline"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-center text-blue-200">
-            This usually takes under a minute.
-          </p>
-        </div>
+        )}
+
+        {/* Progress Bar */}
+        {!error && (
+          <div className="mt-8 space-y-2">
+            <div className="h-2 rounded-full overflow-hidden bg-white/10">
+              <div
+                className="h-full rounded-full transition-all duration-300 ease-out"
+                style={{
+                  width: `${progress}%`,
+                  background: 'linear-gradient(to right, #2188FF, #0560D4)'
+                }}
+              />
+            </div>
+            <p className="text-sm text-center text-blue-200">
+              This may take a few minutes while we generate your podcast.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
