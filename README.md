@@ -1,50 +1,167 @@
-# Cursor 2-Day AI Hackathon — Repo Template
+# PodAsk AI - Research System 🎙️🔬
 
 ![Cursor 2-Day AI Hackathon](https://ai-beavers.com/_next/image?url=%2Fimages%2Fhackathon-hero-20012026.png&w=1920&q=75)
 
-**How to use this template:**
-1. Click "Use this template" → "Create a new repository"
-2. Name your repo and set it to **Public**
-3. Replace this section with your project name and description
+> "Don't just listen. Ask the science." - Intelligent research automation with arXiv semantic search and Gemini AI
 
----
+**🐍 Python Implementation** | Powered by Gemini 2.5 Flash Interactions API
 
-# Project Name
+## 🌟 Features
 
-> One-line description of your project
+### 1. **arXiv Semantic Search** 🚀
+Advanced paper discovery system powered by AI:
+- 🧠 **AI Query Refinement**: Gemini understands your research intent
+- 🔍 **Smart arXiv Search**: Optimized queries with advanced operators
+- 🎯 **Intelligent Ranking**: AI evaluates and ranks papers by relevance
+- 📊 **Top 5 from 20**: Best papers with justification and scores
+- 🔗 **Dual Output**: Full results + simplified links-only JSON
+
+[→ Read Full Documentation](./ARXIV_SEMANTIC_SEARCH.md)
 
 ## Tech Stack
 
-What technologies power your project?
-
-<!-- List your main technologies, frameworks, and services -->
-
-- **Frontend**: e.g., Next.js, React, Tailwind
-- **Backend**: e.g., Node.js, Python, FastAPI
-- **Database**: e.g., Supabase, Firebase, PostgreSQL
-- **AI/ML**: e.g., OpenAI GPT-4, Gemini Pro
-- **Hosting**: e.g., Vercel, Railway
+- **Backend**: Python 3.8+
+- **AI/ML**: Google Gemini 2.5 Flash (Interactions API)
+- **APIs**: arXiv API (Atom XML)
+- **Data Processing**: requests, xml.etree.ElementTree
+- **Future**: ElevenLabs (TTS), React/v0 (Frontend), OpenAI Whisper (STT)
 
 ## How to Run
 
-Step-by-step instructions to run the project locally, including everything that needs to be set up.
+### Installation
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-team/your-project.git
-cd your-project
+git clone <your-repo-url>
+cd haihackaton
 
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Add your API keys to .env
-
-# Run the development server
-npm run dev
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-## Details
+### Configuration
 
-Add anything else you want to share: architecture diagrams, screenshots, challenges faced, future plans, etc.
+Create/update `.env` file:
+
+```env
+# Google Gemini API Key (required)
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+**Get API Key:**
+- Gemini: [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+### Usage
+
+```bash
+# Run arXiv semantic search
+python arxiv_semantic_search.py "transformer architectures for computer vision"
+
+# Run with context
+python arxiv_semantic_search.py "quantum computing" "PhD researching error correction"
+
+# Run quick demo
+python quick_demo.py
+
+# Test API connection
+python test_interactions_api.py
+
+# Run examples
+python example_usage.py 1     # Single example
+python example_usage.py all   # Multiple examples
+```
+
+### Programmatic Usage
+
+```python
+from arxiv_semantic_search import semantic_research_search
+
+# Basic search
+results = semantic_research_search(
+    "deep learning for drug discovery"
+)
+
+# With context and custom options
+results = semantic_research_search(
+    "reinforcement learning for robotics",
+    "Interested in sim-to-real transfer",
+    max_results=30,  # Analyze 30 papers
+    top_n=10         # Return top 10
+)
+```
+
+## Architecture
+
+### arXiv Semantic Search Pipeline
+
+```
+User Query → Gemini Refines → arXiv Search (20 papers) → Gemini Ranks → Top 5 Results
+```
+
+**Step 1: Query Refinement**
+- Gemini analyzes query and context
+- Identifies key concepts and research domains
+- Generates optimized arXiv query with operators
+
+**Step 2: arXiv Search**
+- Searches with refined query
+- Retrieves 20 most relevant papers
+- Extracts full metadata (title, authors, abstract, etc.)
+
+**Step 3: Intelligent Ranking**
+- Gemini evaluates each paper
+- Assigns relevance scores (0-100)
+- Provides justification for selections
+- Returns top 5 with detailed analysis
+
+### Output Example
+
+```
+🏆 #1 - Attention Is All You Need
+
+📝 Authors: Vaswani, Shazeer, Parmar, et al.
+⭐ Relevance Score: 98/100
+💡 Why Relevant: Foundational work on transformer architecture
+🎯 Key Contributions: Introduced self-attention mechanism
+
+🔗 PDF: http://arxiv.org/pdf/1706.03762
+```
+
+## Integration with PodAsk AI
+
+This research system is part of the **PodAsk AI** platform:
+
+1. **Discovery**: arXiv semantic search finds papers
+2. **Synthesis**: Gemini analyzes and connects research
+3. **Narration**: ElevenLabs creates studio-quality podcasts
+4. **Interaction**: Users can "raise hand" to ask questions
+
+See [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) for business details.
+
+## Documentation
+
+- [Getting Started](./GETTING_STARTED.md) ⭐ START HERE - Python setup
+- [ArxivService API Reference](./ARXIV_SERVICE_API.md) 🆕 Service endpoints & dataclass
+- [Python Migration Guide](./PYTHON_COMPLETE.md) 🐍 Python version complete!
+- [arXiv Semantic Search - Full Docs](./ARXIV_SEMANTIC_SEARCH.md)
+- [Output Formats Guide](./OUTPUT_FORMATS.md) - Dual JSON output
+- [New Feature: Links-Only Output](./NEW_FEATURE_LINKS_OUTPUT.md) 🔗
+- [Project Overview - Business Plan](./PROJECT_OVERVIEW.md)
+- [arXiv API Documentation](https://info.arxiv.org/help/api/user-manual.html)
+- [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/interactions)
+
+## Future Plans
+
+- [ ] Multi-paper synthesis and connections
+- [ ] ElevenLabs audio generation
+- [ ] Web interface with React/v0
+- [ ] "Raise Hand" interactive feature
+- [ ] Private knowledge base for enterprises
+
+## Team
+
+**PodAsk AI** - Cursor 2-Day AI Hackathon, Hamburg 2026
+
+---
+
+**Ready to discover?** Run `python quick_demo.py` to see it in action! 🚀

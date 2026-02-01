@@ -1,0 +1,42 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+
+# Node modules (legacy JavaScript)
+node_modules/
+
+# Output files
+csv_files/
+arxiv_results_*.json
+arxiv_top5_links_*.json
+podcast_script_*.md
+*_metadata.json
+
+# Logs
+*.log
+npm-debug.log*
+pip-log.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.ipynb_checkpoints/
+.venv
+nul
+backend/nul

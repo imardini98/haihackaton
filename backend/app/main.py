@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
-from app.api.routes import auth, health, papers, podcasts, interaction
+from app.api.routes import auth, health, papers, podcasts, interaction, arxiv
 
 
 @asynccontextmanager
@@ -11,6 +11,23 @@ async def lifespan(app: FastAPI):
     # Startup
     settings = get_settings()
     print(f"Starting PodAsk API in {settings.app_env} mode")
+    
+    # Debug: Check Supabase configuration
+    if settings.supabase_url:
+        print(f"  Supabase URL: {settings.supabase_url[:30]}...")
+    else:
+        print("  WARNING: SUPABASE_URL is not set!")
+    
+    if settings.supabase_service_key:
+        print(f"  Supabase Service Key: {settings.supabase_service_key[:20]}...{settings.supabase_service_key[-10:]}")
+    else:
+        print("  WARNING: SUPABASE_SERVICE_KEY is not set!")
+    
+    if settings.supabase_anon_key:
+        print(f"  Supabase Anon Key: {settings.supabase_anon_key[:20]}...")
+    else:
+        print("  WARNING: SUPABASE_ANON_KEY is not set!")
+    
     yield
     # Shutdown
     print("Shutting down PodAsk API")

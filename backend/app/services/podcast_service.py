@@ -1,29 +1,104 @@
+"""
+Podcast Service - Orchestrates podcast generation pipeline
+Merged: Uses Gemini Files API with PDF links + Segment system from main
+"""
+
 from __future__ import annotations
 import asyncio
-from typing import Optional
+import io
+import time
+from typing import Optional, List, Any
+
+import requests
+from google import genai
+
+from app.config import get_settings
 from app.services.supabase_service import supabase_service
 from app.services.gemini_service import gemini_service
 from app.services.elevenlabs_service import elevenlabs_service
+from app.services.arxiv_service import arxiv_service
 
 
 class PodcastService:
-    """Orchestrates podcast generation pipeline."""
+    """Orchestrates podcast generation pipeline using PDF links."""
+
+    def __init__(self):
+        settings = get_settings()
+        self.gemini_client = genai.Client(api_key=settings.gemini_api_key)
+
+    def download_and_upload_pdfs(self, pdf_links: List[str]) -> List[Any]:
+        """
+        Download PDFs from arXiv and upload them to Gemini Files API.
+
+        Args:
+            pdf_links: List of PDF URLs from arXiv
+
+        Returns:
+            List of uploaded file objects
+        """
+        uploaded_files = []
+
+        for idx, pdf_url in enumerate(pdf_links, 1):
+            try:
+                # Download PDF
+                response = requests.get(pdf_url, timeout=60)
+                response.raise_for_status()
+                pdf_data = io.BytesIO(response.content)
+
+                # Upload to Gemini Files API
+                uploaded_file = self.gemini_client.files.upload(
+                    file=pdf_data,
+                    config=dict(mime_type='application/pdf')
+                )
+
+                # Wait for file to be processed
+                max_wait = 60  # Maximum wait time per file
+                wait_time = 0
+                while wait_time < max_wait:
+                    file_status = self.gemini_client.files.get(name=uploaded_file.name)
+                    if file_status.state == 'ACTIVE':
+                        break
+                    elif file_status.state == 'FAILED':
+                        raise Exception(f'File processing failed for {pdf_url}')
+                    else:
+                        time.sleep(2)
+                        wait_time += 2
+
+                uploaded_files.append(uploaded_file)
+
+            except Exception as error:
+                raise Exception(f'Error with {pdf_url}: {error}')
+
+        return uploaded_files
 
     async def create_podcast(
         self,
-        paper_ids: list[str],
+        pdf_links: List[str],
         topic: str,
         difficulty_level: str,
         user_id: str
     ) -> dict:
         """Create a new podcast record and start generation."""
+        # Auto-ingest papers from PDF links and get their UUIDs
+        paper_ids = await arxiv_service.auto_ingest_from_pdf_links(pdf_links, user_id)
+        
+        # Store pdf_links, topic, and difficulty_level in script_json 
+        # for easy retrieval during generation
+        initial_config = {
+            "pdf_links": pdf_links,
+            "topic": topic,
+            "difficulty_level": difficulty_level,
+            "status": "config"
+        }
+        
         # Create podcast record with pending status
         podcast_data = {
-            "paper_ids": paper_ids,
-            "topic": topic,
             "title": f"Podcast: {topic}",
+            "summary": topic,  # Use summary to store topic temporarily
             "status": "pending",
-            "user_id": user_id
+            "user_id": user_id,
+            "script_json": initial_config,
+            "paper_ids": paper_ids  # Now populated with actual paper UUIDs
         }
 
         podcast = await supabase_service.insert("podcasts", podcast_data)
@@ -48,17 +123,19 @@ class PodcastService:
                 raise ValueError("Podcast not found")
 
             podcast = podcasts[0]
-            paper_ids = podcast["paper_ids"]
-            topic = podcast["topic"]
+            # Get pdf_links and topic from script_json (initial config)
+            config = podcast.get("script_json", {})
+            pdf_links = config.get("pdf_links", [])
+            topic = config.get("topic", podcast.get("summary", "Research Paper"))
 
-            # Get papers content
-            documents_content = await self._get_papers_content(paper_ids)
+            # Step 1: Download and upload PDFs to Gemini Files API
+            uploaded_files = self.download_and_upload_pdfs(pdf_links)
 
-            # Generate script with Gemini
-            script = await gemini_service.generate_podcast_script(
-                documents_content=documents_content,
+            # Step 2: Generate script with Gemini using uploaded PDF files
+            script = await gemini_service.generate_podcast_script_from_pdfs(
+                uploaded_files=uploaded_files,
                 topic=topic,
-                difficulty_level="intermediate"
+                difficulty_level=config.get("difficulty_level", "intermediate")
             )
 
             # Update podcast with script
@@ -105,29 +182,6 @@ class PodcastService:
                 {"id": podcast_id}
             )
             raise
-
-    async def _get_papers_content(self, paper_ids: list[str]) -> str:
-        """Get combined content from papers."""
-        contents = []
-
-        for paper_id in paper_ids:
-            papers = await supabase_service.select(
-                "papers",
-                filters={"id": paper_id}
-            )
-            if papers:
-                paper = papers[0]
-                content = f"""
-<paper id="{paper['arxiv_id']}">
-<title>{paper['title']}</title>
-<authors>{', '.join(paper.get('authors', []))}</authors>
-<abstract>{paper.get('abstract', '')}</abstract>
-<content>{paper.get('content', paper.get('abstract', ''))}</content>
-</paper>
-"""
-                contents.append(content)
-
-        return "\n".join(contents)
 
     async def _create_segment(self, podcast_id: str, segment_data: dict) -> Optional[dict]:
         """Create a segment and generate its audio."""

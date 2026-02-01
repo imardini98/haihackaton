@@ -1,8 +1,14 @@
+"""
+Podcast API Routes
+Merged: Uses pdf_links with Gemini Files API + Segment system from main
+"""
+
 from __future__ import annotations
 import asyncio
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 from pathlib import Path
+from typing import List
 
 from app.schemas.podcast import (
     PodcastGenerateRequest,
@@ -50,7 +56,7 @@ def _format_podcast_response(podcast: dict, include_segments: bool = False) -> P
         title=podcast["title"],
         summary=podcast.get("summary"),
         topic=podcast.get("topic"),
-        paper_ids=[str(pid) for pid in podcast.get("paper_ids", [])],
+        pdf_links=podcast.get("pdf_links", []),
         status=podcast["status"],
         total_duration_seconds=podcast.get("total_duration_seconds"),
         error_message=podcast.get("error_message"),
@@ -65,19 +71,19 @@ async def generate_podcast(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
-    """Start podcast generation from papers. Returns immediately, generation happens in background."""
-    # Verify papers exist
-    for paper_id in request.paper_ids:
-        papers = await supabase_service.select("papers", filters={"id": paper_id})
-        if not papers:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Paper not found: {paper_id}"
-            )
-
+    """
+    Start podcast generation from arXiv PDF links.
+    
+    - **pdf_links**: List of arXiv PDF URLs to synthesize (1-10 papers)
+    - **topic**: Topic/context for the podcast
+    - **difficulty_level**: beginner, intermediate, or advanced
+    
+    Returns immediately, generation happens in background.
+    Use GET /{podcast_id}/status to poll for completion.
+    """
     # Create podcast record
     podcast = await podcast_service.create_podcast(
-        paper_ids=request.paper_ids,
+        pdf_links=request.pdf_links,
         topic=request.topic,
         difficulty_level=request.difficulty_level,
         user_id=current_user.id
@@ -235,3 +241,12 @@ async def delete_podcast(
     await supabase_service.delete("podcasts", filters={"id": podcast_id})
 
     return {"status": "deleted"}
+
+
+@router.get("/health", tags=["health"])
+async def podcast_health_check():
+    """Health check for the podcast service."""
+    return {
+        "service": "podcast",
+        "status": "healthy"
+    }
