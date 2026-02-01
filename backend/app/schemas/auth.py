@@ -1,9 +1,12 @@
+from typing import Optional
 from pydantic import BaseModel
 
 
 class SignUpRequest(BaseModel):
     email: str
     password: str
+    first_name: str
+    last_name: str
 
 
 class SignInRequest(BaseModel):
@@ -16,11 +19,15 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
     user_id: str
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class UserResponse(BaseModel):
     id: str
     email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class PasswordResetRequest(BaseModel):
