@@ -45,8 +45,12 @@ export function SignupScreen({ onSignup, onBackToLogin }: SignupScreenProps) {
 
     try {
       setIsSubmitting(true);
-      // Backend signup currently accepts {email,password}. First/last name is UI-only for now.
-      const session = await signUp({ email: trimmedEmail, password: trimmedPassword });
+      const session = await signUp({
+        email: trimmedEmail,
+        password: trimmedPassword,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+      });
       onSignup(session);
     } catch (e) {
       if (e instanceof ApiError) {

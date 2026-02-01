@@ -5,11 +5,15 @@ export type AuthResponse = {
   token_type?: string;
   user_id: string;
   email: string;
+  first_name?: string | null;
+  last_name?: string | null;
 };
 
 export type UserResponse = {
   id: string;
   email: string;
+  first_name?: string | null;
+  last_name?: string | null;
 };
 
 export type SignInRequest = {
@@ -20,6 +24,8 @@ export type SignInRequest = {
 export type SignUpRequest = {
   email: string;
   password: string;
+  first_name: string;
+  last_name: string;
 };
 
 export async function signIn(payload: SignInRequest): Promise<AuthResponse> {
