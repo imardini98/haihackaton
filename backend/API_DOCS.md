@@ -27,7 +27,9 @@ Register a new user.
 ```json
 {
   "email": "user@example.com",
-  "password": "securepassword"
+  "password": "securepassword",
+  "first_name": "John",
+  "last_name": "Doe"
 }
 ```
 
@@ -37,7 +39,9 @@ Register a new user.
   "access_token": "eyJ...",
   "token_type": "bearer",
   "user_id": "uuid",
-  "email": "user@example.com"
+  "email": "user@example.com",
+  "first_name": "John",
+  "last_name": "Doe"
 }
 ```
 
@@ -60,7 +64,9 @@ Sign in an existing user.
   "access_token": "eyJ...",
   "token_type": "bearer",
   "user_id": "uuid",
-  "email": "user@example.com"
+  "email": "user@example.com",
+  "first_name": "John",
+  "last_name": "Doe"
 }
 ```
 
@@ -73,7 +79,9 @@ Get current user profile.
 ```json
 {
   "id": "uuid",
-  "email": "user@example.com"
+  "email": "user@example.com",
+  "first_name": "John",
+  "last_name": "Doe"
 }
 ```
 
