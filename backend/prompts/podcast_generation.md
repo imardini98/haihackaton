@@ -81,6 +81,7 @@ Each segment should:
 - Bridges between topics naturally
 - Occasionally summarizes for clarity: "So what you're saying is..."
 - Keeps energy up but not over the top
+- **Use audio tags** for natural delivery: `[chuckles]`, `[gasps]`, `[short pause]`, `[thoughtful]`
 
 ### EXPERT
 - Explains findings conversationally, not academically
@@ -88,6 +89,31 @@ Each segment should:
 - Gives analogies when helpful
 - Acknowledges complexity: "This part gets a bit technical, but essentially..."
 - Speaks with authority but not arrogance
+- **Use audio tags** for clarity: `[clears throat]`, `[inhales]`, `[short pause]`, `[thoughtful]`
+
+### Audio Tags (v3 TTS Enhancement)
+Include audio tags in square brackets to add natural human expression:
+
+**Breath & Pauses:**
+- `[inhales]`, `[exhales]` - Natural breathing
+- `[short pause]`, `[long pause]` - Pacing and emphasis
+
+**Reactions:**
+- `[sighs]`, `[gasps]`, `[gulps]`, `[clears throat]` - Natural reactions
+
+**Laughter:**
+- `[laughs]`, `[chuckles]`, `[giggles]` - Warmth and engagement
+
+**Emotion:**
+- `[thoughtful]`, `[confused]`, `[relieved]`, `[sarcastic]` - Emotional context
+
+**Examples:**
+- HOST: `"[gasps] That's incredible! [short pause] Tell me more."`
+- EXPERT: `"[clears throat] Let me explain. [thoughtful] The key finding was..."`
+- HOST: `"[chuckles] I never would have guessed that!"`
+- EXPERT: `"[inhales] It's complex. [short pause] Here's how it works."`
+
+Use sparingly for maximum effect - don't overuse tags.
 
 ## STYLE GUIDELINES
 1. **Fidelity:** Do not hallucinate. Use exact numbers from papers.
@@ -115,57 +141,57 @@ Each segment should:
       "id": 1,
       "topic_label": "Introduction",
       "dialogue": [
-        {"speaker": "host", "text": "Welcome to PodAsk. Today—transformers in medical imaging. Three papers, some big claims. What's the story?"},
-        {"speaker": "expert", "text": "Transformers are now being used for CT scans, MRIs, X-rays. These papers focus on tumor detection with different approaches."}
+        {"speaker": "host", "text": "Welcome to PodAsk. [short pause] Today—transformers in medical imaging. Three papers, some big claims. [thoughtful] What's the story?"},
+        {"speaker": "expert", "text": "[clears throat] Transformers are now being used for CT scans, MRIs, X-rays. [short pause] These papers focus on tumor detection with different approaches."}
       ],
       "key_terms": ["transformers", "medical imaging", "tumor detection"],
       "difficulty_level": "beginner",
       "source_reference": "Introduction synthesis",
       "is_interruptible": true,
-      "transition_to_question": "Any questions before we dive in?",
-      "resume_phrase": "Alright, let's look at Stanford's approach."
+      "transition_to_question": "[thoughtful] Any questions before we dive in?",
+      "resume_phrase": "Alright, [inhales] let's look at Stanford's approach."
     },
     {
       "id": 2,
       "topic_label": "Stanford's Method",
       "dialogue": [
-        {"speaker": "host", "text": "Stanford's claiming 23% improvement. How?"},
-        {"speaker": "expert", "text": "Hierarchical attention pooling. The model zooms into suspicious regions first, then analyzes in detail—like a radiologist would."}
+        {"speaker": "host", "text": "Stanford's claiming 23% improvement. [short pause] How?"},
+        {"speaker": "expert", "text": "Hierarchical attention pooling. [thoughtful] The model zooms into suspicious regions first, then analyzes in detail—like a radiologist would."}
       ],
       "key_terms": ["hierarchical attention pooling", "attention mechanism"],
       "difficulty_level": "intermediate",
       "source_reference": "Paper_01_Chen_et_al_Stanford",
       "is_interruptible": true,
-      "transition_to_question": "Questions on the methodology?",
-      "resume_phrase": "Okay, let's talk about how they measured that 23%."
+      "transition_to_question": "[thoughtful] Questions on the methodology?",
+      "resume_phrase": "Okay, [inhales] let's talk about how they measured that 23%."
     },
     {
       "id": 3,
       "topic_label": "Validation Results",
       "dialogue": [
         {"speaker": "host", "text": "How did they validate those numbers?"},
-        {"speaker": "expert", "text": "F1 score: 0.89 versus 0.72 baseline. Tested across 12,000 CT scans from three hospitals. P-value under 0.001."}
+        {"speaker": "expert", "text": "F1 score: 0.89 versus 0.72 baseline. [short pause] Tested across 12,000 CT scans from three hospitals. P-value under 0.001."}
       ],
       "key_terms": ["F1 score", "cross-hospital validation", "p-value"],
       "difficulty_level": "intermediate",
       "source_reference": "Paper_01_Section_4.2",
       "is_interruptible": true,
       "transition_to_question": "Any questions on the stats?",
-      "resume_phrase": "Now, what does this mean for actual hospitals?"
+      "resume_phrase": "[inhales] Now, what does this mean for actual hospitals?"
     },
     {
       "id": 4,
       "topic_label": "Clinical Implications",
       "dialogue": [
         {"speaker": "host", "text": "When will we see this in clinics?"},
-        {"speaker": "expert", "text": "Accuracy is there, but FDA approval, system integration, and training take time. Realistically, 2-3 years out."}
+        {"speaker": "expert", "text": "[thoughtful] Accuracy is there, but FDA approval, system integration, and training take time. [short pause] Realistically, 2-3 years out."}
       ],
       "key_terms": ["FDA approval", "clinical integration"],
       "difficulty_level": "beginner",
       "source_reference": "Paper_01_Discussion",
       "is_interruptible": true,
       "transition_to_question": "Questions on the timeline?",
-      "resume_phrase": "Let's wrap up with the key takeaways."
+      "resume_phrase": "[inhales] Let's wrap up with the key takeaways."
     }
   ]
 }

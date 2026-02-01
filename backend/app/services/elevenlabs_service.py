@@ -31,19 +31,52 @@ class ElevenLabsService:
         self,
         text: str,
         voice_id: str,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        model_id: Optional[str] = None
     ) -> str:
-        """Convert text to speech and save to file."""
+        """
+        Convert text to speech and save to file.
+        
+        Supports v3 audio tags in square brackets:
+        - Breath & pauses: [inhales], [exhales], [short pause], [long pause]
+        - Reactions: [sighs], [gasps], [gulps], [clears throat], [coughs]
+        - Laughter: [laughs], [chuckles], [giggles], [snorts]
+        - Voice delivery: [whispers], [shouts], [stammers]
+        - Emotion: [thoughtful], [confused], [nervous], [relieved], [sarcastic]
+        
+        Note: If audio tags are being spoken as words instead of performed,
+        set ENABLE_AUDIO_TAGS=False in .env to strip them out.
+        """
         if not filename:
             filename = f"{uuid.uuid4()}.mp3"
 
         audio_path = self._get_audio_path(filename)
 
-        # Generate audio
+        # Use configured model or provided override
+        settings = get_settings()
+        if model_id is None:
+            model_id = settings.elevenlabs_model_id
+        
+        # Strip audio tags if they're not working properly
+        if not settings.enable_audio_tags:
+            import re
+            text = re.sub(r'\[.*?\]', '', text)  # Remove all [tags]
+            text = re.sub(r'\s+', ' ', text).strip()  # Clean up extra spaces
+        
+        # For v3 audio tags, use eleven_v3 or eleven_ttv_v3 (actual v3 models)
+        # Note: Some voices may not support all audio tags perfectly
+        # If tags are being spoken instead of performed, try:
+        # 1. Use eleven_v3 (main v3 model with best audio tag support)
+        # 2. Use eleven_ttv_v3 (alternative v3 model)
+        # 3. Check if your API tier has v3 access
+        # 4. Test with different voices from your account
+
+        # Generate audio with v3 support
         audio = self.client.text_to_speech.convert(
             voice_id=voice_id,
             text=text,
-            model_id="eleven_multilingual_v2"
+            model_id=model_id,
+            output_format="mp3_44100_128"
         )
 
         # Save to file
@@ -105,6 +138,35 @@ class ElevenLabsService:
                 model_id="scribe_v1"
             )
         return transcription.text
+
+    @staticmethod
+    def add_audio_tag(text: str, tag: str) -> str:
+        """
+        Add an audio tag to text for v3 TTS.
+        
+        Examples:
+            add_audio_tag("Let me think about that", "thoughtful")
+            -> "[thoughtful] Let me think about that"
+            
+            add_audio_tag("Really?", "surprised")
+            -> "[surprised] Really?"
+        """
+        return f"[{tag}] {text}"
+
+    @staticmethod
+    def wrap_with_pause(text: str, pause_type: str = "short pause") -> str:
+        """
+        Wrap text with pauses for natural pacing.
+        
+        Args:
+            text: The text to wrap
+            pause_type: "short pause" or "long pause"
+            
+        Example:
+            wrap_with_pause("This is important", "short pause")
+            -> "[short pause] This is important [short pause]"
+        """
+        return f"[{pause_type}] {text} [{pause_type}]"
 
 
 elevenlabs_service = ElevenLabsService()
