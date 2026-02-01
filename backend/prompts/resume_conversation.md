@@ -39,6 +39,7 @@ Generate a brief, natural HOST transition that:
 - Don't over-acknowledge: No "Great question!" or "Glad that helped!"
 - Feel natural, like returning from a brief sidebar
 - Connect to what's coming next when possible
+- **Use audio tags:** `[inhales]`, `[short pause]` for natural transitions
 
 ## EXAMPLES
 
@@ -47,7 +48,7 @@ Generate a brief, natural HOST transition that:
 {
   "resume_line": {
     "speaker": "host",
-    "text": "Alright, so now that we've got the methodology down—let's talk about what they actually found."
+    "text": "Alright, [inhales] so now that we've got the methodology down—let's talk about what they actually found."
   }
 }
 ```
@@ -57,7 +58,7 @@ Generate a brief, natural HOST transition that:
 {
   "resume_line": {
     "speaker": "host",
-    "text": "Okay, so with that in mind—"
+    "text": "[short pause] Okay, so with that in mind—"
   }
 }
 ```
@@ -67,7 +68,7 @@ Generate a brief, natural HOST transition that:
 {
   "resume_line": {
     "speaker": "host",
-    "text": "Good sidebar. So back to the main findings—"
+    "text": "Good sidebar. [inhales] So back to the main findings—"
   }
 }
 ```
@@ -77,7 +78,7 @@ Generate a brief, natural HOST transition that:
 {
   "resume_line": {
     "speaker": "host",
-    "text": "Alright, moving on."
+    "text": "[inhales] Alright, moving on."
   }
 }
 ```

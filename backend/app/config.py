@@ -1,7 +1,11 @@
 from __future__ import annotations
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
 import json
+
+# Get the backend directory (where .env lives)
+BACKEND_DIR = Path(__file__).parent.parent
 
 
 class Settings(BaseSettings):
@@ -17,7 +21,9 @@ class Settings(BaseSettings):
     # ElevenLabs Voice Config
     elevenlabs_host_voice_id: str = ""
     elevenlabs_expert_voice_id: str = ""
-
+    elevenlabs_model_id: str = "eleven_v3"  # Actual v3 model for audio tags
+    enable_audio_tags: bool = True  # Set to False if tags are spoken as words
+    
     # App Config
     app_env: str = "development"
     debug: bool = True
@@ -38,7 +44,7 @@ class Settings(BaseSettings):
         return self.app_env == "development"
 
     class Config:
-        env_file = ".env"
+        env_file = BACKEND_DIR / ".env"
         env_file_encoding = "utf-8"
 
 
