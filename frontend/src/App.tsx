@@ -72,6 +72,29 @@ function stripRecoveryParamsFromUrl() {
   }
 }
 
+function getPodcastIdFromUrl(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('podcast_id');
+  } catch {
+    return null;
+  }
+}
+
+function updatePodcastIdInUrl(podcastId: string | null) {
+  try {
+    const url = new URL(window.location.href);
+    if (podcastId) {
+      url.searchParams.set('podcast_id', podcastId);
+    } else {
+      url.searchParams.delete('podcast_id');
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  } catch {
+    // ignore
+  }
+}
+
 function getStoredSession(): AuthResponse | null {
   try {
     const raw = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -87,9 +110,12 @@ function getStoredSession(): AuthResponse | null {
 }
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('landing');
-  const [topic, setTopic] = useState('');
-  const [podcastId, setPodcastId] = useState<string | null>(null);
+  // Check URL for podcast_id on initial load
+  const initialPodcastId = getPodcastIdFromUrl();
+
+  const [appState, setAppState] = useState<AppState>(initialPodcastId ? 'player' : 'landing');
+  const [topic, setTopic] = useState(initialPodcastId ? 'Saved Podcast' : '');
+  const [podcastId, setPodcastId] = useState<string | null>(initialPodcastId);
   const [authState, setAuthState] = useState<AuthState>('unknown');
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgotPassword' | 'resetPassword'>('login');
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
@@ -183,6 +209,7 @@ export default function App() {
 
   const handleResearchComplete = (generatedPodcastId: string) => {
     setPodcastId(generatedPodcastId);
+    updatePodcastIdInUrl(generatedPodcastId);
     setAppState('player');
   };
 
@@ -190,6 +217,7 @@ export default function App() {
     setAppState('landing');
     setTopic('');
     setPodcastId(null);
+    updatePodcastIdInUrl(null);
   };
 
   // Test mode: skip directly to an existing podcast
@@ -197,6 +225,7 @@ export default function App() {
     const testPodcastId = '89ab627c-4dc5-4bc8-988e-347582cdeaa4';
     setTopic('Test Podcast');
     setPodcastId(testPodcastId);
+    updatePodcastIdInUrl(testPodcastId);
     setAppState('player');
   };
 
