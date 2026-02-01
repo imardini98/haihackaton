@@ -4,7 +4,8 @@ import { ResearchProgressScreen } from './components/ResearchProgressScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { PlayerScreen } from './components/PlayerScreen';
 import { LoginScreen } from './components/LoginScreen';
-import type { AuthResponse } from './api/auth';
+import { SignupScreen } from './components/SignupScreen';
+import { getMe, type AuthResponse } from './api/auth';
 
 type AppState = 'landing' | 'research' | 'loading' | 'player';
 type AuthState = 'unknown' | 'authenticated' | 'unauthenticated';
@@ -30,23 +31,44 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>('landing');
   const [topic, setTopic] = useState('');
   const [authState, setAuthState] = useState<AuthState>('unknown');
+  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
-    try {
+    let cancelled = false;
+
+    const clearStoredSession = () => {
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+        localStorage.removeItem('podask.email');
+      } catch {
+        // ignore
+      }
+    };
+
+    const bootstrapAuth = async () => {
       const session = getStoredSession();
-      if (session) {
-        setAuthState('authenticated');
+
+      if (!session) {
+        clearStoredSession();
+        if (!cancelled) setAuthState('unauthenticated');
         return;
       }
 
-      // Clear legacy storage (boolean auth) so we don't show "logged in"
-      // without having a real backend session token.
-      localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
-      localStorage.removeItem('podask.email');
-      setAuthState('unauthenticated');
-    } catch {
-      setAuthState('unauthenticated');
-    }
+      try {
+        await getMe(session.access_token);
+        if (!cancelled) setAuthState('authenticated');
+      } catch {
+        clearStoredSession();
+        if (!cancelled) setAuthState('unauthenticated');
+      }
+    };
+
+    bootstrapAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleGeneratePodcast = (userTopic: string) => {
@@ -81,6 +103,7 @@ export default function App() {
       // ignore
     }
     setAuthState('unauthenticated');
+    setAuthView('login');
     handleBackToLanding();
   };
 
@@ -96,8 +119,16 @@ export default function App() {
         </button>
       )}
 
-      {authState !== 'authenticated' ? (
-        <LoginScreen onLogin={handleLogin} />
+      {authState === 'unknown' ? (
+        <div className="min-h-screen flex items-center justify-center px-6 py-12 md:py-16">
+          <div className="text-white/80 text-sm">Checking session…</div>
+        </div>
+      ) : authState !== 'authenticated' ? (
+        authView === 'signup' ? (
+          <SignupScreen onSignup={handleLogin} onBackToLogin={() => setAuthView('login')} />
+        ) : (
+          <LoginScreen onLogin={handleLogin} onCreateAccount={() => setAuthView('signup')} />
+        )
       ) : (
         <>
           {appState === 'landing' && (
